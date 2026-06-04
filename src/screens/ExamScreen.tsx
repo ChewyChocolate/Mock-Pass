@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 function formatTime(seconds: number) {
   const h = Math.floor(seconds / 3600);
@@ -30,6 +31,8 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
   const { currentQuestion, isFirst, isLast, answeredCount, flaggedCount } = exam;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showNavigator, setShowNavigator] = useState(false);
+  const confirmRef = useFocusTrap<HTMLDivElement>(showConfirm);
+  const navigatorRef = useFocusTrap<HTMLDivElement>(showNavigator);
 
   const isLowTime = state.timeLeft < 300;
   const total = state.questions.length;
@@ -137,7 +140,7 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
       </header>
 
       <div className="flex-1 flex overflow-hidden relative z-10 pb-[72px]">
-        <aside className="w-80 bg-surface-container border-r border-outline-variant hidden md:flex flex-col shrink-0">
+        <aside className="w-80 bg-surface-container border-r border-outline-variant hidden md:flex flex-col shrink-0" aria-label="Question navigator">
           <div className="p-6 border-b border-outline-variant">
             <div className="flex items-center gap-4 mb-2">
               <div className="w-10 h-10 bg-secondary-container flex items-center justify-center border border-outline-variant rounded-sm">
@@ -166,13 +169,15 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
 
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-surface-container-low/50">
             <div className="grid grid-cols-5 gap-2">
-              {state.questions.map((q, idx) => {
+                {state.questions.map((q, idx) => {
                 const status = getStatus(q);
                 const isCurrent = idx === state.currentIndex;
                 return (
                   <button
                     key={q.id}
                     onClick={() => goTo(idx)}
+                    aria-current={isCurrent ? 'true' : undefined}
+                    aria-label={`Item ${idx + 1}, ${status}`}
                     className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
                       ${
                         isCurrent
@@ -292,6 +297,8 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
             </button>
             <button
               onClick={() => toggleFlag(currentQuestion.id)}
+              aria-pressed={isFlagged}
+              aria-label={isFlagged ? 'Unflag this item' : 'Flag this item for review'}
               className={`flex flex-col md:flex-row items-center justify-center gap-2 transition-all group pt-1 md:pt-0 mx-2 ${
                 isFlagged ? 'text-terracotta' : 'text-on-surface-variant hover:text-terracotta'
               }`}
@@ -347,19 +354,36 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
       </footer>
 
       {showConfirm && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-container border border-outline-variant max-w-md w-full rounded shadow-2xl p-8 relative">
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          role="presentation"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowConfirm(false);
+          }}
+        >
+          <div
+            ref={confirmRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="submit-confirm-title"
+            aria-describedby="submit-confirm-desc"
+            className="bg-surface-container border border-outline-variant max-w-md w-full rounded shadow-2xl p-8 relative focus:outline-none"
+          >
             <button
               onClick={() => setShowConfirm(false)}
+              aria-label="Close submit confirmation"
               className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
             >
               <X className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-3 mb-4">
               <AlertTriangle className="w-6 h-6 text-error" />
-              <h3 className="text-xl font-bold tracking-tight">Submit exam?</h3>
+              <h3 id="submit-confirm-title" className="text-xl font-bold tracking-tight">
+                Submit exam?
+              </h3>
             </div>
-            <p className="text-on-surface-variant mb-6 text-sm leading-relaxed">
+            <p id="submit-confirm-desc" className="text-on-surface-variant mb-6 text-sm leading-relaxed">
               You answered <strong className="text-on-surface">{answeredCount}</strong> of {total} items.
               {flaggedCount > 0 && (
                 <>
@@ -388,12 +412,26 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
       )}
 
       {showNavigator && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center md:hidden">
-          <div className="bg-surface-container border-t md:border border-outline-variant w-full md:max-w-2xl md:rounded rounded-t-2xl p-6 max-h-[85vh] overflow-y-auto custom-scrollbar">
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center md:hidden"
+          role="presentation"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowNavigator(false);
+          }}
+        >
+          <div
+            ref={navigatorRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Question navigator"
+            className="bg-surface-container border-t md:border border-outline-variant w-full md:max-w-2xl md:rounded rounded-t-2xl p-6 max-h-[85vh] overflow-y-auto custom-scrollbar focus:outline-none"
+          >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold tracking-tight">Question Navigator</h3>
               <button
                 onClick={() => setShowNavigator(false)}
+                aria-label="Close navigator"
                 className="text-on-surface-variant hover:text-on-surface"
               >
                 <X className="w-5 h-5" />
@@ -410,6 +448,8 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
                       goTo(idx);
                       setShowNavigator(false);
                     }}
+                    aria-current={isCurrent ? 'true' : undefined}
+                    aria-label={`Item ${idx + 1}, ${status}`}
                     className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
                       ${
                         isCurrent

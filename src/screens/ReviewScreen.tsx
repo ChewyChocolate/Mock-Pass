@@ -91,7 +91,7 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
 
   return (
     <MainLayout onNavigate={onNavigate} currentScreen="review">
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
+      <div className="printable-report max-w-7xl mx-auto px-4 md:px-8 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
         <div className="lg:col-span-4 space-y-6">
           <section className="bg-surface-container-low border border-outline-variant p-8 rounded relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4">
@@ -223,7 +223,7 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
         </div>
 
         <div className="lg:col-span-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+          <div className="no-print flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-on-surface mb-2">Review Workspace</h1>
               <p className="text-base text-on-surface-variant">
@@ -238,7 +238,7 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <div className="no-print flex items-center gap-2 mb-6 flex-wrap">
             <Filter className="w-4 h-4 text-on-surface-variant" />
             {(['all', 'incorrect', 'flagged', 'correct'] as FilterMode[]).map((mode) => {
               const active = filter === mode;
@@ -371,7 +371,9 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
                     <div className="border-t border-outline-variant/40 pt-4">
                       <button
                         onClick={() => toggleAccordion(q.id)}
-                        className="w-full flex items-center justify-between py-2 group focus:outline-none"
+                        aria-expanded={!!openAccordions[q.id]}
+                        aria-controls={`solution-${q.id}`}
+                        className="w-full flex items-center justify-between py-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                       >
                         <span className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
                           <BrainCircuit className="w-4 h-4" />
@@ -384,6 +386,9 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
                         />
                       </button>
                       <div
+                        id={`solution-${q.id}`}
+                        role="region"
+                        aria-label={`Solution for ${q.id}`}
                         className={`overflow-hidden transition-all duration-300 ease-in-out ${
                           openAccordions[q.id] ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0'
                         }`}

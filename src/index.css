@@ -143,3 +143,46 @@ body {
     border-left: 3px solid var(--color-primary);
     background-color: color-mix(in srgb, var(--color-primary) 5%, transparent);
 }
+
+@media print {
+    .grain-texture,
+    .cse-pattern,
+    .custom-scrollbar::-webkit-scrollbar,
+    .custom-scrollbar::-webkit-scrollbar-track,
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        display: none !important;
+        background: transparent !important;
+    }
+
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    header,
+    aside,
+    nav,
+    .no-print {
+        display: none !important;
+    }
+
+    .printable-report {
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .printable-report * {
+        background: transparent !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+        border-color: #d0d0d0 !important;
+    }
+
+    .printable-report section,
+    .printable-report > div {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}
+
