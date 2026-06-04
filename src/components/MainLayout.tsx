@@ -1,9 +1,9 @@
 import React from 'react';
-import { BaseScreenProps } from '../types';
+import { BaseScreenProps, Screen } from '../types';
 import { BookOpen, HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 
-export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: string }) {
+export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: Screen }) {
   const { theme, toggleTheme } = useTheme();
   
   return (
