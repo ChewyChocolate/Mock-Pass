@@ -17,17 +17,30 @@ export const PROFESSIONAL_TOPIC_WEIGHTS: Record<QuestionTopic, number> = {
   'Clerical Ability': 0,
 };
 
+const WEIGHTED_SECTION_TOPICS: QuestionTopic[] = [
+  'Verbal Ability',
+  'Analytical Reasoning',
+  'Numerical Ability',
+  'General Information',
+];
+
 export const PROFESSIONAL_SECTIONS: {
   topic: QuestionTopic;
   count: number;
   weight: number;
-}[] = (
-  ['Verbal Ability', 'Analytical Reasoning', 'Numerical Ability', 'General Information'] as QuestionTopic[]
-).map((topic) => ({
+}[] = WEIGHTED_SECTION_TOPICS.map((topic) => ({
   topic,
   count: PROFESSIONAL_QUESTIONS.filter((q) => q.topic === topic).length,
   weight: PROFESSIONAL_TOPIC_WEIGHTS[topic],
 }));
+
+const weightedTotal = PROFESSIONAL_SECTIONS.reduce((sum, s) => sum + s.weight, 0);
+if (Math.abs(weightedTotal - 1.0) > 1e-9) {
+  throw new Error(
+    `PROFESSIONAL_SECTIONS weights must sum to 1.0, got ${weightedTotal}. ` +
+      'Update PROFESSIONAL_TOPIC_WEIGHTS or WEIGHTED_SECTION_TOPICS.',
+  );
+}
 
 export function durationForLevel(level: ExamLevel): number {
   return level === 'professional' ? PRO_DURATION_SECONDS : SUB_PRO_DURATION_SECONDS;
@@ -52,16 +65,11 @@ export function calculateScore(
   }
 
   let weightedSum = 0;
-  let totalWeight = 0;
-  for (const [topic, weight] of Object.entries(PROFESSIONAL_TOPIC_WEIGHTS)) {
-    if (weight <= 0) continue;
+  for (const topic of WEIGHTED_SECTION_TOPICS) {
     const stat = topicStats[topic];
     if (!stat || stat.total === 0) continue;
     const pct = (stat.correct / stat.total) * 100;
-    weightedSum += pct * weight;
-    totalWeight += weight;
+    weightedSum += pct * PROFESSIONAL_TOPIC_WEIGHTS[topic];
   }
-  if (totalWeight === 0) return 0;
-  const normalized = (weightedSum / totalWeight) * 100;
-  return Math.round(normalized);
+  return Math.round(weightedSum);
 }

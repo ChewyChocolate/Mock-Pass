@@ -1799,7 +1799,7 @@ const PROFESSIONAL_QUESTIONS: Question[] = [
     level: 'professional',
     topic: 'Analytical Reasoning',
     prompt:
-      'Choose the pair that best expresses the same relationship as SYMPHONY:COMPOSER',
+      'Choose the pair that best expresses the same relationship as SYMPHONY:COMPOSER.',
     options: [
       { id: 'A', text: 'novel:author' },
       { id: 'B', text: 'song:singer' },

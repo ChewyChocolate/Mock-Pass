@@ -261,6 +261,9 @@ export function ExamProvider({ children }: { children: ReactNode }) {
     const persisted = loadPersisted();
     if (!persisted) return init;
     const merged: ExamState = { ...init, ...persisted };
+    // Migration: a persisted 'sub-professional' session (from before Sub-Pro
+    // became a placeholder) is silently promoted to 'professional' so the
+    // dashboard's "Coming Soon" guard cannot strand the user in mid-exam.
     if (merged.level === 'sub-professional') {
       merged.level = 'professional';
       merged.questions = getQuestionsForLevel('professional');
