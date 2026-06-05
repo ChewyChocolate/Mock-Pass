@@ -246,7 +246,7 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                           : 'text-on-surface-variant hover:text-primary'
                       }`}
                     >
-                      {item.id === 'dashboard' ? 'Home' : item.id === 'exam' ? 'Library' : 'Community'}
+                      {item.label}
                     </button>
                   );
                 })}

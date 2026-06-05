@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { BaseScreenProps } from '../types';
+import { BaseScreenProps, ExamLevel } from '../types';
 import MainLayout from '../components/MainLayout';
 import {
   TrendingUp,
@@ -220,12 +220,41 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
   const topicMastery = useMemo(() => {
     const map = new Map<string, { correct: number; total: number }>();
     for (const s of history) {
-      const session = s as typeof s & { topicStats?: Record<string, { correct: number; total: number }> };
+      const stats = s.topicStats as Record<string, { correct: number; total: number }>;
+      for (const [topic, stat] of Object.entries(stats)) {
+        const entry = map.get(topic) ?? { correct: 0, total: 0 };
+        entry.correct += stat.correct;
+        entry.total += stat.total;
+        map.set(topic, entry);
+      }
     }
-    const last = history[0];
-    if (!last) return [];
-    const rows: { topic: string; pct: number; correct: number; total: number }[] = [];
-    return rows;
+    return Array.from(map.entries())
+      .map(([topic, { correct, total }]) => ({
+        topic,
+        correct,
+        total,
+        pct: total === 0 ? 0 : Math.round((correct / total) * 100),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [history]);
+
+  const levelBreakdown = useMemo(() => {
+    const byLevel: Record<ExamLevel, { exams: number; scoreSum: number }> = {
+      professional: { exams: 0, scoreSum: 0 },
+      'sub-professional': { exams: 0, scoreSum: 0 },
+    };
+    for (const s of history) {
+      const entry = byLevel[s.level];
+      entry.exams += 1;
+      entry.scoreSum += s.score;
+    }
+    return (Object.entries(byLevel) as [ExamLevel, { exams: number; scoreSum: number }][])
+      .map(([level, { exams, scoreSum }]) => ({
+        level,
+        exams,
+        avg: exams === 0 ? 0 : Math.round(scoreSum / exams),
+      }))
+      .filter((row) => row.exams > 0);
   }, [history]);
 
   const totalHours = (stats.totalSeconds / 3600).toFixed(1);
@@ -380,6 +409,61 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
             <p className="text-on-surface-variant text-sm">No exam history available.</p>
           )}
         </section>
+
+        {hasHistory && topicMastery.length > 0 && (
+          <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
+            <div className="flex items-center gap-2 mb-6">
+              <Award className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-bold tracking-tight">Topic Mastery</h2>
+            </div>
+            <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-6">
+              Aggregated across all sessions
+            </p>
+            <div className="space-y-5">
+              {topicMastery.map((row) => {
+                const good = row.pct >= 80;
+                return (
+                  <div key={row.topic}>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium">{row.topic}</span>
+                      <span className={`text-xs font-bold ${good ? 'text-primary' : 'text-error'}`}>
+                        {row.pct}% · {row.correct}/{row.total}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-outline-variant rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${good ? 'bg-primary' : 'bg-error'}`}
+                        style={{ width: `${row.pct}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {hasHistory && levelBreakdown.length > 1 && (
+          <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
+            <div className="flex items-center gap-2 mb-6">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-bold tracking-tight">Performance by Level</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {levelBreakdown.map((row) => (
+                <div key={row.level} className="p-5 border border-outline-variant rounded">
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant mb-1">
+                    {row.level === 'sub-professional' ? 'Sub-Professional' : 'Professional'}
+                  </p>
+                  <p className="text-3xl font-bold text-on-surface mb-1">{row.avg}%</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {row.exams} {row.exams === 1 ? 'session' : 'sessions'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {hasHistory && (
           <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">

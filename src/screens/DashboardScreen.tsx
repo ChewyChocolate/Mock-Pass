@@ -1,9 +1,26 @@
-import { useMemo } from 'react';
-import { BaseScreenProps } from '../types';
+import React, { useMemo } from 'react';
+import { BaseScreenProps, ExamLevel } from '../types';
 import MainLayout from '../components/MainLayout';
-import { TrendingUp, ClipboardCheck, Timer, FileEdit, ArrowRight } from 'lucide-react';
+import {
+  TrendingUp,
+  ClipboardCheck,
+  Timer,
+  FileEdit,
+  ArrowRight,
+  BookOpen,
+  GraduationCap,
+  Check,
+  Lock,
+  Sparkles,
+} from 'lucide-react';
 import { useExam } from '../context/ExamContext';
-import { QUESTION_BANK } from '../data/questions';
+import {
+  PRO_DURATION_SECONDS,
+  SUB_PRO_DURATION_SECONDS,
+  PROFESSIONAL_QUESTION_COUNT,
+  PROFESSIONAL_SECTIONS,
+  SUB_PROFESSIONAL_QUESTION_COUNT,
+} from '../data/questions';
 
 function formatDate(ts: number) {
   const d = new Date(ts);
@@ -26,10 +43,60 @@ function pctColorClass(pct: number) {
   return 'text-error';
 }
 
+function formatDuration(seconds: number) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+type LevelOption = {
+  id: ExamLevel;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  questions: number;
+  durationSeconds: number;
+  topics: { name: string; weight?: number; count?: number }[];
+  available: boolean;
+  badge?: string;
+};
+
+const LEVEL_OPTIONS: LevelOption[] = [
+  {
+    id: 'sub-professional',
+    label: 'Sub-Professional',
+    description: 'For first-level government positions. Clerical and basic office skills focus.',
+    icon: <BookOpen className="w-5 h-5" />,
+    questions: SUB_PROFESSIONAL_QUESTION_COUNT,
+    durationSeconds: SUB_PRO_DURATION_SECONDS,
+    topics: [
+      { name: 'Verbal Ability' },
+      { name: 'Numerical Ability' },
+      { name: 'Clerical Ability' },
+    ],
+    available: false,
+    badge: 'Coming Soon',
+  },
+  {
+    id: 'professional',
+    label: 'Professional',
+    description: 'For second-level government positions. 150 items divided across 4 weighted sections.',
+    icon: <GraduationCap className="w-5 h-5" />,
+    questions: PROFESSIONAL_QUESTION_COUNT,
+    durationSeconds: PRO_DURATION_SECONDS,
+    topics: PROFESSIONAL_SECTIONS.map((s) => ({
+      name: s.topic,
+      weight: s.weight,
+      count: s.count,
+    })),
+    available: true,
+  },
+];
+
 export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
-  const { state, start } = useExam();
+  const { state, setLevel, start } = useExam();
   const history = state.history;
-  const totalQuestions = QUESTION_BANK.length;
 
   const stats = useMemo(() => {
     if (history.length === 0) {
@@ -50,13 +117,22 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
   const lastSevenDays = useMemo(() => {
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const recent = history.filter((s) => s.submittedAt >= cutoff);
-    const target = totalQuestions * 3;
     const progress = Math.min(100, Math.round((recent.length / 3) * 100));
-    return { progress, target, sessions: recent.length };
-  }, [history, totalQuestions]);
+    return { progress, sessions: recent.length };
+  }, [history]);
 
   const recentRows = history.slice(0, 5);
   const hasHistory = history.length > 0;
+  const inProgress = state.status === 'in-progress';
+
+  const handleStart = () => {
+    if (inProgress) {
+      onNavigate('exam');
+      return;
+    }
+    start();
+    onNavigate('exam');
+  };
 
   return (
     <MainLayout onNavigate={onNavigate} currentScreen="dashboard">
@@ -156,46 +232,133 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-          <div
-            onClick={() => {
-              if (state.status !== 'in-progress') start();
-              onNavigate('exam');
-            }}
-            className="bg-surface p-8 border border-outline-variant rounded relative overflow-hidden group hover:border-primary cursor-pointer transition-all active:scale-[0.98]"
-          >
-            <div className="absolute -right-8 -top-8 opacity-5 group-hover:rotate-45 transition-transform duration-700 pointer-events-none">
-              <FileEdit className="w-48 h-48 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold mb-3 tracking-tight">Full Mock Exam</h3>
-            <p className="text-base text-on-surface-variant mb-8 max-w-sm">
-              Simulated environment with timed mechanical constraints.
-            </p>
-            <div className="flex items-center gap-4 text-primary group-hover:translate-x-2 transition-transform duration-300">
-              <span className="text-xs uppercase font-bold tracking-widest">
-                {state.status === 'in-progress' ? 'Resume Exam' : 'Start Simulation'}
-              </span>
-              <ArrowRight className="w-5 h-5" />
-            </div>
+        <div className="mb-12 bg-surface border border-outline-variant rounded p-6 md:p-8 relative overflow-hidden">
+          <div className="absolute -right-8 -top-8 opacity-5 group-hover:rotate-45 transition-transform duration-700 pointer-events-none">
+            <FileEdit className="w-48 h-48 text-primary" />
           </div>
+          <h3 className="text-xl font-bold mb-2 tracking-tight">Full Mock Exam</h3>
+          <p className="text-base text-on-surface-variant mb-6 max-w-xl">
+            Choose the level that matches the position you&apos;re applying for, then start a timed, full-length simulation.
+          </p>
 
-          <div
-            onClick={() => onNavigate('review')}
-            className="bg-surface p-8 border border-outline-variant rounded relative overflow-hidden group hover:border-primary cursor-pointer transition-all active:scale-[0.98]"
+          <fieldset className="mb-6" disabled={inProgress}>
+            <legend className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-3">
+              Examination Level
+            </legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {LEVEL_OPTIONS.map((opt) => {
+                const selected = state.level === opt.id;
+                const disabled = !opt.available || inProgress;
+                return (
+                  <label
+                    key={opt.id}
+                    className={`relative flex flex-col gap-2 p-5 border rounded-sm transition-all ${
+                      disabled
+                        ? 'cursor-not-allowed border-outline-variant/40 bg-surface-container-low/40 opacity-70'
+                        : selected
+                        ? 'cursor-pointer border-primary bg-secondary-container/40 ring-1 ring-primary'
+                        : 'cursor-pointer border-outline-variant bg-surface-container-low hover:border-primary/60'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="exam-level"
+                      value={opt.id}
+                      checked={selected}
+                      disabled={disabled}
+                      onChange={() => setLevel(opt.id)}
+                      className="sr-only"
+                    />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={
+                            selected && !disabled
+                              ? 'text-primary'
+                              : 'text-on-surface-variant'
+                          }
+                        >
+                          {opt.icon}
+                        </span>
+                        <span className="font-bold text-on-surface">{opt.label}</span>
+                      </div>
+                      {opt.badge ? (
+                        <span className="text-[10px] font-bold uppercase tracking-widest border border-terracotta/40 text-terracotta px-2 py-0.5 rounded-sm flex items-center gap-1">
+                          {opt.id === 'sub-professional' ? (
+                            <Lock className="w-3 h-3" />
+                          ) : (
+                            <Sparkles className="w-3 h-3" />
+                          )}
+                          {opt.badge}
+                        </span>
+                      ) : selected ? (
+                        <span className="w-5 h-5 bg-primary text-on-primary rounded-full flex items-center justify-center">
+                          <Check className="w-3 h-3" />
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-on-surface-variant leading-relaxed">
+                      {opt.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {opt.topics.map((t) => {
+                        const label = t.weight
+                          ? `${t.name} · ${Math.round(t.weight * 100)}%${t.count ? ` (${t.count})` : ''}`
+                          : t.name;
+                        return (
+                          <span
+                            key={t.name}
+                            className="text-[10px] font-bold uppercase tracking-widest border border-outline-variant px-2 py-0.5 rounded-sm text-on-surface-variant"
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-4 mt-1 text-xs text-on-surface-variant">
+                      <span>
+                        <strong className="text-on-surface">{opt.questions}</strong> questions
+                      </span>
+                      <span>·</span>
+                      <span>
+                        <strong className="text-on-surface">
+                          {formatDuration(opt.durationSeconds)}
+                        </strong>{' '}
+                        duration
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <button
+            onClick={handleStart}
+            disabled={!LEVEL_OPTIONS.find((o) => o.id === state.level)?.available}
+            className="bg-primary text-on-primary px-8 py-3 rounded text-xs font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:active:scale-100"
           >
-            <div className="absolute -right-8 -top-8 opacity-5 group-hover:scale-110 transition-transform duration-700 pointer-events-none">
-              <ClipboardCheck className="w-48 h-48 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold mb-3 tracking-tight">Review Results</h3>
-            <p className="text-base text-on-surface-variant mb-8 max-w-sm">
-              {hasHistory
-                ? `See detailed breakdowns from your last exam and track progress.`
-                : 'Take an exam first to unlock detailed review.'}
-            </p>
-            <div className="flex items-center gap-4 text-primary group-hover:translate-x-2 transition-transform duration-300">
-              <span className="text-xs uppercase font-bold tracking-widest">View Report</span>
-              <ArrowRight className="w-5 h-5" />
-            </div>
+            {inProgress ? 'Resume Exam' : 'Start Simulation'}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div
+          onClick={() => onNavigate('review')}
+          className="bg-surface p-8 border border-outline-variant rounded mb-12 relative overflow-hidden group hover:border-primary cursor-pointer transition-all active:scale-[0.98]"
+        >
+          <div className="absolute -right-8 -top-8 opacity-5 group-hover:scale-110 transition-transform duration-700 pointer-events-none">
+            <ClipboardCheck className="w-48 h-48 text-primary" />
+          </div>
+          <h3 className="text-xl font-bold mb-3 tracking-tight">Review Results</h3>
+          <p className="text-base text-on-surface-variant mb-8 max-w-sm">
+            {hasHistory
+              ? `See detailed breakdowns from your last exam and track progress.`
+              : 'Take an exam first to unlock detailed review.'}
+          </p>
+          <div className="flex items-center gap-4 text-primary group-hover:translate-x-2 transition-transform duration-300">
+            <span className="text-xs uppercase font-bold tracking-widest">View Report</span>
+            <ArrowRight className="w-5 h-5" />
           </div>
         </div>
 
@@ -227,6 +390,9 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
                       Session
                     </th>
                     <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                      Level
+                    </th>
+                    <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
                       Type
                     </th>
                     <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
@@ -247,8 +413,13 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div className={`w-2 h-2 rounded-full ${dotColorClass(s.score)}`}></div>
-                          <span className="text-sm font-medium">Mock Exam · {s.totalQuestions} items</span>
+                          <span className="text-sm font-medium">
+                            Mock Exam · {s.totalQuestions} items
+                          </span>
                         </div>
+                      </td>
+                      <td className="px-6 py-5 text-sm text-on-surface-variant capitalize">
+                        {s.level === 'sub-professional' ? 'Sub-Pro' : 'Professional'}
                       </td>
                       <td className="px-6 py-5 text-sm text-on-surface-variant">Mock Exam</td>
                       <td className={`px-6 py-5 text-sm font-bold ${pctColorClass(s.score)}`}>

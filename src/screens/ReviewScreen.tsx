@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { BaseScreenProps } from '../types';
 import MainLayout from '../components/MainLayout';
-import { CheckCircle2, XCircle, BrainCircuit, ChevronDown, Filter } from 'lucide-react';
+import { CheckCircle2, XCircle, BrainCircuit, ChevronDown, Filter, Scale } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
-import { PASSING_SCORE } from '../data/questions';
+import { PASSING_SCORE, PROFESSIONAL_SECTIONS, PROFESSIONAL_TOPIC_WEIGHTS } from '../data/questions';
 
 type FilterMode = 'all' | 'incorrect' | 'flagged' | 'correct';
 
@@ -67,8 +67,12 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
       correct,
       total: t,
       pct: t === 0 ? 0 : Math.round((correct / t) * 100),
+      weight: PROFESSIONAL_TOPIC_WEIGHTS[topic as keyof typeof PROFESSIONAL_TOPIC_WEIGHTS] ?? 0,
     }));
   }, [state.questions, state.answers]);
+
+  const isProfessional = state.level === 'professional';
+  const totalWeight = PROFESSIONAL_SECTIONS.reduce((sum, s) => sum + s.weight, 0);
 
   if (state.status !== 'submitted') {
     return (
@@ -100,9 +104,14 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
               </span>
             </div>
 
-            <h2 className="text-xs uppercase font-bold tracking-widest text-on-surface-variant mb-10">
+            <h2 className="text-xs uppercase font-bold tracking-widest text-on-surface-variant mb-2">
               Performance Summary
             </h2>
+            <div className="mb-8">
+              <span className="text-[10px] font-bold uppercase tracking-widest border border-primary/40 text-primary px-2 py-1 rounded-sm">
+                {state.level === 'sub-professional' ? 'Sub-Professional' : 'Professional'}
+              </span>
+            </div>
 
             <div className="flex flex-col items-center">
               <div className="relative w-48 h-48 mb-8 flex items-center justify-center">
@@ -195,18 +204,37 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
           </section>
 
           <section className="bg-surface-container-low border border-outline-variant p-8 rounded">
-            <h3 className="text-xs uppercase font-bold tracking-widest text-on-surface-variant mb-8">
-              Domain Proficiency
-            </h3>
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xs uppercase font-bold tracking-widest text-on-surface-variant">
+                Domain Proficiency
+              </h3>
+              {isProfessional && (
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-1">
+                  <Scale className="w-3 h-3" />
+                  Weighted Sections
+                </span>
+              )}
+            </div>
             <div className="space-y-6">
               {topicBreakdown.map((row) => {
                 const good = row.pct >= 80;
+                const weightPct = Math.round(row.weight * 100);
                 return (
                   <div key={row.topic}>
-                    <div className="flex justify-between mb-2">
+                    <div className="flex justify-between mb-2 gap-2">
                       <span className="text-sm font-medium">{row.topic}</span>
-                      <span className={`text-xs font-bold ${good ? 'text-primary' : 'text-error'}`}>
-                        {row.pct}% · {row.correct}/{row.total}
+                      <span className="text-xs font-mono text-on-surface-variant whitespace-nowrap">
+                        {row.correct}/{row.total}
+                        {isProfessional && weightPct > 0 && (
+                          <span className="ml-2 text-on-surface-variant/70">
+                            × {weightPct}%
+                          </span>
+                        )}
+                        <span
+                          className={`ml-3 font-bold ${good ? 'text-primary' : 'text-error'}`}
+                        >
+                          {row.pct}%
+                        </span>
                       </span>
                     </div>
                     <div className="h-1 bg-outline-variant rounded-full overflow-hidden">
@@ -219,6 +247,18 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
                 );
               })}
             </div>
+            {isProfessional && (
+              <div className="mt-6 pt-6 border-t border-outline-variant/40 text-xs text-on-surface-variant leading-relaxed">
+                <p>
+                  Final score is the weighted sum of each section&apos;s accuracy.
+                  Weights: Verbal {Math.round(PROFESSIONAL_TOPIC_WEIGHTS['Verbal Ability'] * 100)}%
+                  · Analytical {Math.round(PROFESSIONAL_TOPIC_WEIGHTS['Analytical Reasoning'] * 100)}%
+                  · Numerical {Math.round(PROFESSIONAL_TOPIC_WEIGHTS['Numerical Ability'] * 100)}%
+                  · General {Math.round(PROFESSIONAL_TOPIC_WEIGHTS['General Information'] * 100)}%
+                  (total {Math.round(totalWeight * 100)}%).
+                </p>
+              </div>
+            )}
           </section>
         </div>
 

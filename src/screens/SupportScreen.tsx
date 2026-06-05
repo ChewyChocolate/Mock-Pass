@@ -47,12 +47,27 @@ const FAQS: FaqItem[] = [
 export default function SupportScreen({ onNavigate }: BaseScreenProps) {
   const [openFaq, setOpenFaq] = useState<Record<number, boolean>>({ 0: true });
   const [sent, setSent] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; email?: string; message?: string }>({});
   const [form, setForm] = useState({ name: '', email: '', message: '' });
 
   const formRef = useFocusTrap<HTMLFormElement>(false);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    const trimmed = {
+      name: form.name.trim(),
+      email: form.email.trim(),
+      message: form.message.trim(),
+    };
+    const next: typeof errors = {};
+    if (trimmed.name.length < 2) next.name = 'Please enter your name.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed.email)) next.email = 'Please enter a valid email address.';
+    if (trimmed.message.length < 10) next.message = 'Message should be at least 10 characters.';
+    if (Object.keys(next).length > 0) {
+      setErrors(next);
+      return;
+    }
+    setErrors({});
     setSent(true);
     setForm({ name: '', email: '', message: '' });
     window.setTimeout(() => setSent(false), 4000);
@@ -169,7 +184,7 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
                 </div>
               </div>
             ) : (
-              <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+              <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate>
                 <div>
                   <label
                     htmlFor="support-name"
@@ -179,12 +194,25 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
                   </label>
                   <input
                     id="support-name"
-                    required
                     value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full mt-1 bg-surface-container-low border border-outline-variant rounded px-3 py-2.5 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      setForm({ ...form, name: e.target.value });
+                      if (errors.name) setErrors({ ...errors, name: undefined });
+                    }}
+                    aria-invalid={!!errors.name}
+                    aria-describedby={errors.name ? 'support-name-err' : undefined}
+                    className={`w-full mt-1 bg-surface-container-low border rounded px-3 py-2.5 text-on-surface focus:outline-none focus:ring-2 ${
+                      errors.name
+                        ? 'border-error focus:ring-error'
+                        : 'border-outline-variant focus:ring-primary'
+                    }`}
                     placeholder="Your full name"
                   />
+                  {errors.name && (
+                    <p id="support-name-err" className="text-xs text-error mt-1">
+                      {errors.name}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label
@@ -196,12 +224,25 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
                   <input
                     id="support-email"
                     type="email"
-                    required
                     value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full mt-1 bg-surface-container-low border border-outline-variant rounded px-3 py-2.5 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      setForm({ ...form, email: e.target.value });
+                      if (errors.email) setErrors({ ...errors, email: undefined });
+                    }}
+                    aria-invalid={!!errors.email}
+                    aria-describedby={errors.email ? 'support-email-err' : undefined}
+                    className={`w-full mt-1 bg-surface-container-low border rounded px-3 py-2.5 text-on-surface focus:outline-none focus:ring-2 ${
+                      errors.email
+                        ? 'border-error focus:ring-error'
+                        : 'border-outline-variant focus:ring-primary'
+                    }`}
                     placeholder="you@example.com"
                   />
+                  {errors.email && (
+                    <p id="support-email-err" className="text-xs text-error mt-1">
+                      {errors.email}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label
@@ -212,13 +253,26 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
                   </label>
                   <textarea
                     id="support-message"
-                    required
                     rows={5}
                     value={form.message}
-                    onChange={(e) => setForm({ ...form, message: e.target.value })}
-                    className="w-full mt-1 bg-surface-container-low border border-outline-variant rounded px-3 py-2.5 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    onChange={(e) => {
+                      setForm({ ...form, message: e.target.value });
+                      if (errors.message) setErrors({ ...errors, message: undefined });
+                    }}
+                    aria-invalid={!!errors.message}
+                    aria-describedby={errors.message ? 'support-message-err' : undefined}
+                    className={`w-full mt-1 bg-surface-container-low border rounded px-3 py-2.5 text-on-surface focus:outline-none focus:ring-2 resize-none ${
+                      errors.message
+                        ? 'border-error focus:ring-error'
+                        : 'border-outline-variant focus:ring-primary'
+                    }`}
                     placeholder="How can we help?"
                   />
+                  {errors.message && (
+                    <p id="support-message-err" className="text-xs text-error mt-1">
+                      {errors.message}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="submit"

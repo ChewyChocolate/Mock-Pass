@@ -1,27 +1,37 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useReducer,
   type ReactNode,
 } from 'react';
 import type {
+  ExamLevel,
   ExamSessionSummary,
   ExamStatus,
   Question,
   QuestionOption,
   QuestionStatus,
 } from '../types';
-import { EXAM_DURATION_SECONDS, QUESTION_BANK } from '../data/questions';
+import {
+  calculateScore,
+  durationForLevel,
+  getQuestionsForLevel,
+} from '../data/questions';
 
-const STORAGE_KEY = 'mockpass:exam:v1';
+const STORAGE_KEY = 'mockpass:exam:v2';
+const LEGACY_KEY = 'mockpass:exam:v1';
 
 interface ExamState {
+  level: ExamLevel;
   questions: Question[];
   currentIndex: number;
   answers: Record<string, QuestionOption['id']>;
   flags: Record<string, boolean>;
   timeLeft: number;
+  endsAt: number | null;
   status: ExamStatus;
   startedAt: number | null;
   submittedAt: number | null;
@@ -29,6 +39,7 @@ interface ExamState {
 }
 
 type Action =
+  | { type: 'SET_LEVEL'; level: ExamLevel }
   | { type: 'START_EXAM' }
   | { type: 'SELECT_ANSWER'; questionId: string; optionId: QuestionOption['id'] }
   | { type: 'TOGGLE_FLAG'; questionId: string }
@@ -41,12 +52,16 @@ type Action =
   | { type: 'SIGN_OUT' }
   | { type: 'HYDRATE'; payload: Partial<ExamState> };
 
+const DEFAULT_LEVEL: ExamLevel = 'professional';
+
 const initialState: ExamState = {
-  questions: QUESTION_BANK,
+  level: DEFAULT_LEVEL,
+  questions: getQuestionsForLevel(DEFAULT_LEVEL),
   currentIndex: 0,
   answers: {},
   flags: {},
-  timeLeft: EXAM_DURATION_SECONDS,
+  timeLeft: durationForLevel(DEFAULT_LEVEL),
+  endsAt: null,
   status: 'idle',
   startedAt: null,
   submittedAt: null,
@@ -55,16 +70,29 @@ const initialState: ExamState = {
 
 function reducer(state: ExamState, action: Action): ExamState {
   switch (action.type) {
-    case 'START_EXAM':
+    case 'SET_LEVEL':
+      if (state.status === 'in-progress' || state.status === 'submitted') return state;
+      return {
+        ...state,
+        level: action.level,
+        questions: getQuestionsForLevel(action.level),
+        currentIndex: 0,
+        answers: {},
+        flags: {},
+        timeLeft: durationForLevel(action.level),
+      };
+    case 'START_EXAM': {
+      const now = Date.now();
       return {
         ...state,
         status: 'in-progress',
-        startedAt: Date.now(),
-        timeLeft: EXAM_DURATION_SECONDS,
+        startedAt: now,
+        endsAt: now + state.timeLeft * 1000,
         currentIndex: 0,
         answers: {},
         flags: {},
       };
+    }
     case 'SELECT_ANSWER':
       if (state.status !== 'in-progress') return state;
       return {
@@ -91,40 +119,57 @@ function reducer(state: ExamState, action: Action): ExamState {
     }
     case 'TICK': {
       if (state.status !== 'in-progress') return state;
-      if (state.timeLeft <= 0) return state;
-      return { ...state, timeLeft: state.timeLeft - 1 };
+      if (!state.endsAt) return state;
+      const remaining = Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000));
+      return { ...state, timeLeft: remaining };
     }
     case 'SUBMIT': {
       if (state.status !== 'in-progress') return state;
       const submittedAt = Date.now();
-      const correct = state.questions.reduce(
-        (acc, q) => (state.answers[q.id] === q.correctOptionId ? acc + 1 : acc),
-        0,
-      );
-      const score = Math.round((correct / state.questions.length) * 100);
+      const topicStats: Record<string, { correct: number; total: number }> = {};
+      let correct = 0;
+      for (const q of state.questions) {
+        const entry = topicStats[q.topic] ?? { correct: 0, total: 0 };
+        entry.total += 1;
+        if (state.answers[q.id] === q.correctOptionId) {
+          entry.correct += 1;
+          correct += 1;
+        }
+        topicStats[q.topic] = entry;
+      }
+      const score = calculateScore(state.level, topicStats);
       const timeSpentSeconds = state.startedAt
-        ? Math.floor((submittedAt - state.startedAt) / 1000)
+        ? Math.min(
+            durationForLevel(state.level),
+            Math.floor((submittedAt - state.startedAt) / 1000),
+          )
         : 0;
       const summary: ExamSessionSummary = {
         id: `session-${submittedAt}`,
+        level: state.level,
         startedAt: state.startedAt ?? submittedAt,
         submittedAt,
         totalQuestions: state.questions.length,
         correct,
         score,
         timeSpentSeconds,
+        topicStats,
       };
       return {
         ...state,
         status: 'submitted',
         submittedAt,
         timeLeft: 0,
+        endsAt: null,
         history: [summary, ...state.history].slice(0, 20),
       };
     }
     case 'RESET':
       return {
         ...initialState,
+        level: state.level,
+        questions: getQuestionsForLevel(state.level),
+        timeLeft: durationForLevel(state.level),
         history: state.history,
       };
     case 'SIGN_OUT':
@@ -141,6 +186,7 @@ function reducer(state: ExamState, action: Action): ExamState {
 
 interface ExamContextValue {
   state: ExamState;
+  setLevel: (level: ExamLevel) => void;
   start: () => void;
   selectAnswer: (questionId: string, optionId: QuestionOption['id']) => void;
   toggleFlag: (questionId: string) => void;
@@ -159,6 +205,7 @@ interface ExamContextValue {
   flaggedCount: number;
   correctCount: number;
   score: number;
+  durationSeconds: number;
 }
 
 const ExamContext = createContext<ExamContextValue | undefined>(undefined);
@@ -167,9 +214,10 @@ function loadPersisted(): Partial<ExamState> | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<ExamState>;
-    if (parsed.status === 'in-progress') {
-      return { ...parsed, timeLeft: EXAM_DURATION_SECONDS };
+    const parsed = JSON.parse(raw) as Partial<ExamState> & { questions?: Question[] };
+    if (parsed.status === 'in-progress' && parsed.endsAt) {
+      const remaining = Math.max(0, Math.ceil((parsed.endsAt - Date.now()) / 1000));
+      return { ...parsed, timeLeft: remaining };
     }
     return parsed;
   } catch {
@@ -180,6 +228,7 @@ function loadPersisted(): Partial<ExamState> | null {
 function savePersisted(state: ExamState) {
   try {
     const toSave: Partial<ExamState> = {
+      level: state.level,
       questions: state.questions,
       currentIndex: state.currentIndex,
       answers: state.answers,
@@ -187,6 +236,7 @@ function savePersisted(state: ExamState) {
       status: state.status,
       startedAt: state.startedAt,
       submittedAt: state.submittedAt,
+      endsAt: state.endsAt,
       history: state.history,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -195,10 +245,33 @@ function savePersisted(state: ExamState) {
   }
 }
 
+function migrateLegacy() {
+  try {
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (!legacy) return;
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function ExamProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState, (init) => {
+    migrateLegacy();
     const persisted = loadPersisted();
-    return persisted ? { ...init, ...persisted } : init;
+    if (!persisted) return init;
+    const merged: ExamState = { ...init, ...persisted };
+    if (merged.level === 'sub-professional') {
+      merged.level = 'professional';
+      merged.questions = getQuestionsForLevel('professional');
+      merged.timeLeft = durationForLevel('professional');
+    }
+    if (persisted.status === 'in-progress' && (persisted.endsAt ?? 0) <= Date.now()) {
+      merged.status = 'idle';
+      merged.endsAt = null;
+      merged.timeLeft = durationForLevel(merged.level);
+    }
+    return merged;
   });
 
   useEffect(() => {
@@ -217,8 +290,47 @@ export function ExamProvider({ children }: { children: ReactNode }) {
     }
   }, [state.status, state.timeLeft]);
 
+  const { correctCount, score, answeredCount, flaggedCount } = useMemo(() => {
+    let correct = 0;
+    const topicStats: Record<string, { correct: number; total: number }> = {};
+    for (const q of state.questions) {
+      const entry = topicStats[q.topic] ?? { correct: 0, total: 0 };
+      entry.total += 1;
+      if (state.answers[q.id] === q.correctOptionId) {
+        entry.correct += 1;
+        correct += 1;
+      }
+      topicStats[q.topic] = entry;
+    }
+    return {
+      correctCount: correct,
+      score: state.questions.length === 0
+        ? 0
+        : calculateScore(state.level, topicStats),
+      answeredCount: Object.keys(state.answers).length,
+      flaggedCount: Object.values(state.flags).filter(Boolean).length,
+    };
+  }, [state.questions, state.answers, state.flags, state.level]);
+
+  const setLevel = useCallback((level: ExamLevel) => dispatch({ type: 'SET_LEVEL', level }), []);
+
+  const getStatus = useCallback(
+    (question: Question): QuestionStatus => {
+      if (state.flags[question.id]) return 'flagged';
+      if (state.answers[question.id]) return 'answered';
+      return 'unanswered';
+    },
+    [state.flags, state.answers],
+  );
+
+  const currentQuestion = state.questions[state.currentIndex];
+  const isFirst = state.currentIndex === 0;
+  const isLast = state.currentIndex === state.questions.length - 1;
+  const durationSeconds = durationForLevel(state.level);
+
   const value: ExamContextValue = {
     state,
+    setLevel,
     start: () => dispatch({ type: 'START_EXAM' }),
     selectAnswer: (questionId, optionId) =>
       dispatch({ type: 'SELECT_ANSWER', questionId, optionId }),
@@ -230,33 +342,17 @@ export function ExamProvider({ children }: { children: ReactNode }) {
     submit: () => dispatch({ type: 'SUBMIT' }),
     reset: () => dispatch({ type: 'RESET' }),
     signOut: () => dispatch({ type: 'SIGN_OUT' }),
-    getStatus: (question) => {
-      if (state.flags[question.id]) return 'flagged';
-      if (state.answers[question.id]) return 'answered';
-      return 'unanswered';
-    },
+    getStatus,
     get currentQuestion() {
-      return state.questions[state.currentIndex];
+      return currentQuestion;
     },
-    isFirst: state.currentIndex === 0,
-    isLast: state.currentIndex === state.questions.length - 1,
-    answeredCount: Object.keys(state.answers).length,
-    flaggedCount: Object.values(state.flags).filter(Boolean).length,
-    correctCount: state.questions.reduce(
-      (acc, q) => (state.answers[q.id] === q.correctOptionId ? acc + 1 : acc),
-      0,
-    ),
-    score:
-      state.questions.length === 0
-        ? 0
-        : Math.round(
-            (state.questions.reduce(
-              (acc, q) => (state.answers[q.id] === q.correctOptionId ? acc + 1 : acc),
-              0,
-            ) /
-              state.questions.length) *
-              100,
-          ),
+    isFirst,
+    isLast,
+    answeredCount,
+    flaggedCount,
+    correctCount,
+    score,
+    durationSeconds,
   };
 
   return <ExamContext.Provider value={value}>{children}</ExamContext.Provider>;

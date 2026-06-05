@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Screen } from './types';
 import { ThemeProvider } from './ThemeContext';
 import { ExamProvider, useExam } from './context/ExamContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ReviewScreen from './screens/ReviewScreen';
@@ -13,15 +14,24 @@ import './index.css';
 function Router() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const { state } = useExam();
+  const initialized = useRef(false);
+  const prevStatus = useRef(state.status);
 
   useEffect(() => {
-    if (state.status === 'in-progress' && currentScreen !== 'exam' && currentScreen !== 'login') {
+    if (initialized.current) return;
+    initialized.current = true;
+    if (state.status === 'in-progress') {
       setCurrentScreen('exam');
     }
-    if (state.status === 'submitted' && currentScreen !== 'review' && currentScreen !== 'login') {
+  }, [state.status]);
+
+  useEffect(() => {
+    if (!initialized.current) return;
+    if (prevStatus.current === 'in-progress' && state.status === 'submitted') {
       setCurrentScreen('review');
     }
-  }, [state.status, currentScreen]);
+    prevStatus.current = state.status;
+  }, [state.status]);
 
   const handleNavigate = (screen: Screen) => {
     setCurrentScreen(screen);
@@ -40,9 +50,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <ExamProvider>
-        <div className="min-h-screen bg-surface font-sans text-on-surface antialiased format-selection">
-          <Router />
-        </div>
+        <ErrorBoundary>
+          <div className="min-h-screen bg-surface font-sans text-on-surface antialiased format-selection">
+            <Router />
+          </div>
+        </ErrorBoundary>
       </ExamProvider>
     </ThemeProvider>
   );
