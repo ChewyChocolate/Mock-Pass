@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { BaseScreenProps, Screen } from '../types';
-import { BookOpen, HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User } from 'lucide-react';
+import React from 'react';
+import { BookOpen, HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useExam } from '../context/ExamContext';
 
 interface NavItem {
   id: Screen;
@@ -13,34 +16,37 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
   { id: 'exam', label: 'Take Exam', icon: <BookOpen className="w-5 h-5" /> },
   { id: 'review', label: 'Review Results', icon: <FileQuestion className="w-5 h-5" /> },
+  { id: 'performance', label: 'Performance', icon: <BarChart2 className="w-5 h-5" /> },
+  { id: 'support', label: 'Support', icon: <HelpCircle className="w-5 h-5" /> },
 ];
 
-const STUB_ITEMS: { label: string; icon: React.ReactNode }[] = [
-  { label: 'Performance', icon: <BarChart2 className="w-5 h-5" /> },
-  { label: 'Support', icon: <HelpCircle className="w-5 h-5" /> },
+const PRO_FEATURES = [
+  'Unlimited mock exams',
+  'Detailed per-topic analytics',
+  'Downloadable performance reports',
+  'Personalized study plan',
+  'Priority support response',
+  'No ads, ever',
 ];
 
 export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: Screen }) {
   const { theme, toggleTheme } = useTheme();
+  const { signOut } = useExam();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const upgradeRef = useFocusTrap<HTMLDivElement>(upgradeOpen);
 
-  useEffect(() => {
+  const closeUpgrade = () => setUpgradeOpen(false);
+  const closeMenus = () => {
     setDrawerOpen(false);
     setMenuOpen(false);
-  }, [currentScreen]);
+  };
 
-  useEffect(() => {
-    if (!drawerOpen && !menuOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setDrawerOpen(false);
-        setMenuOpen(false);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [drawerOpen, menuOpen]);
+  const navigateAndClose = (id: Screen) => {
+    onNavigate(id);
+    setDrawerOpen(false);
+  };
 
   const SidebarBody = (
     <>
@@ -57,7 +63,7 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => navigateAndClose(item.id)}
               aria-current={active ? 'page' : undefined}
               className={`w-full text-left pl-4 py-3 flex items-center gap-3 transition-all ${
                 active
@@ -70,25 +76,14 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
             </button>
           );
         })}
-
-        {STUB_ITEMS.map((item) => (
-          <button
-            key={item.label}
-            disabled
-            className="w-full text-left pl-4 py-3 flex items-center gap-3 transition-all text-on-surface-variant/50 cursor-not-allowed"
-            aria-disabled="true"
-          >
-            {item.icon}
-            <span className="text-xs font-semibold tracking-widest uppercase">{item.label}</span>
-            <span className="ml-auto text-[9px] uppercase font-bold tracking-widest border border-outline-variant/40 px-1.5 py-0.5 rounded-sm">
-              Soon
-            </span>
-          </button>
-        ))}
       </nav>
 
       <div className="px-6 mt-auto">
-        <button className="w-full py-3 bg-primary text-on-primary text-xs font-semibold uppercase tracking-widest hover:brightness-110 transition-all border border-transparent hover:border-on-primary rounded">
+        <button
+          onClick={() => setUpgradeOpen(true)}
+          className="w-full py-3 bg-primary text-on-primary text-xs font-semibold uppercase tracking-widest hover:brightness-110 transition-all border border-transparent hover:border-on-primary rounded flex items-center justify-center gap-2"
+        >
+          <Sparkles className="w-4 h-4" />
           Upgrade to Pro
         </button>
       </div>
@@ -129,6 +124,96 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
         </div>
       )}
 
+      {upgradeOpen && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          role="presentation"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') closeUpgrade();
+          }}
+        >
+          <div
+            ref={upgradeRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upgrade-title"
+            className="bg-surface-container border border-outline-variant max-w-2xl w-full rounded shadow-2xl p-8 relative focus:outline-none max-h-[90vh] overflow-y-auto"
+          >
+            <button
+              onClick={closeUpgrade}
+              aria-label="Close upgrade dialog"
+              className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-primary-container border border-outline-variant flex items-center justify-center rounded-sm">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <h2 id="upgrade-title" className="text-2xl font-bold tracking-tight">
+                Upgrade to Mock Pass Pro
+              </h2>
+            </div>
+            <p className="text-on-surface-variant mb-6">
+              Unlock your full review potential with unlimited exams and deep analytics.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="border border-outline-variant rounded p-5">
+                <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant mb-1">
+                  Free
+                </p>
+                <p className="text-3xl font-bold text-on-surface mb-3">₱0</p>
+                <ul className="text-sm text-on-surface-variant space-y-2">
+                  <li>3 mock exams / month</li>
+                  <li>Basic review</li>
+                  <li>Standard timer</li>
+                </ul>
+              </div>
+              <div className="border-2 border-primary bg-primary-container/30 rounded p-5 relative">
+                <span className="absolute -top-2 right-4 bg-primary text-on-primary text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-sm">
+                  Most Popular
+                </span>
+                <p className="text-[10px] uppercase font-bold tracking-widest text-primary mb-1">
+                  Pro · Monthly
+                </p>
+                <p className="text-3xl font-bold text-on-surface mb-3">
+                  ₱199<span className="text-base text-on-surface-variant">/mo</span>
+                </p>
+                <ul className="text-sm text-on-surface space-y-2">
+                  {PRO_FEATURES.map((f) => (
+                    <li key={f} className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-tertiary shrink-0 mt-0.5" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={closeUpgrade}
+                className="flex-1 py-3 border border-outline-variant text-on-surface font-bold uppercase tracking-widest text-xs hover:bg-surface-variant transition-all"
+              >
+                Maybe Later
+              </button>
+              <button
+                onClick={closeUpgrade}
+                className="flex-1 py-3 bg-primary text-on-primary font-bold uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                Upgrade Now
+              </button>
+            </div>
+            <p className="text-[10px] text-on-surface-variant text-center mt-4 opacity-70">
+              Payments are coming soon. This is a preview of the upgrade experience.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col md:pl-64 z-10 w-full relative">
         <header className="bg-surface/90 backdrop-blur-md border-b border-outline-variant sticky top-0 z-30">
           <div className="flex justify-between items-center w-full px-4 md:px-8 py-4 max-w-7xl mx-auto">
@@ -148,7 +233,7 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
 
             <div className="hidden md:flex gap-8 items-center">
               <nav aria-label="Quick links" className="flex gap-6">
-                {NAV_ITEMS.map((item) => {
+                {NAV_ITEMS.slice(0, 3).map((item) => {
                   const active = currentScreen === item.id;
                   return (
                     <button
@@ -214,7 +299,8 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                         <button
                           role="menuitem"
                           onClick={() => {
-                            setMenuOpen(false);
+                            signOut();
+                            closeMenus();
                             onNavigate('login');
                           }}
                           className="w-full px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-variant flex items-center gap-2 border-t border-outline-variant"

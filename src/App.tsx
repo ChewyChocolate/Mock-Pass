@@ -6,6 +6,8 @@ import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ReviewScreen from './screens/ReviewScreen';
 import ExamScreen from './screens/ExamScreen';
+import PerformanceScreen from './screens/PerformanceScreen';
+import SupportScreen from './screens/SupportScreen';
 import './index.css';
 
 function Router() {
@@ -13,10 +15,10 @@ function Router() {
   const { state } = useExam();
 
   useEffect(() => {
-    if (state.status === 'in-progress' && currentScreen !== 'exam') {
+    if (state.status === 'in-progress' && currentScreen !== 'exam' && currentScreen !== 'login') {
       setCurrentScreen('exam');
     }
-    if (state.status === 'submitted' && currentScreen !== 'review') {
+    if (state.status === 'submitted' && currentScreen !== 'review' && currentScreen !== 'login') {
       setCurrentScreen('review');
     }
   }, [state.status, currentScreen]);
@@ -29,6 +31,8 @@ function Router() {
   if (currentScreen === 'login') return <LoginScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'dashboard') return <DashboardScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'review') return <ReviewScreen onNavigate={handleNavigate} />;
+  if (currentScreen === 'performance') return <PerformanceScreen onNavigate={handleNavigate} />;
+  if (currentScreen === 'support') return <SupportScreen onNavigate={handleNavigate} />;
   return <ExamScreen onNavigate={handleNavigate} />;
 }
 

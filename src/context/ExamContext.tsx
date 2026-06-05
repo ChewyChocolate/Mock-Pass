@@ -38,6 +38,7 @@ type Action =
   | { type: 'TICK' }
   | { type: 'SUBMIT' }
   | { type: 'RESET' }
+  | { type: 'SIGN_OUT' }
   | { type: 'HYDRATE'; payload: Partial<ExamState> };
 
 const initialState: ExamState = {
@@ -126,6 +127,11 @@ function reducer(state: ExamState, action: Action): ExamState {
         ...initialState,
         history: state.history,
       };
+    case 'SIGN_OUT':
+      return {
+        ...initialState,
+        history: state.history,
+      };
     case 'HYDRATE':
       return { ...state, ...action.payload };
     default:
@@ -144,6 +150,7 @@ interface ExamContextValue {
   tick: () => void;
   submit: () => void;
   reset: () => void;
+  signOut: () => void;
   getStatus: (question: Question) => QuestionStatus;
   currentQuestion: Question;
   isFirst: boolean;
@@ -222,6 +229,7 @@ export function ExamProvider({ children }: { children: ReactNode }) {
     tick: () => dispatch({ type: 'TICK' }),
     submit: () => dispatch({ type: 'SUBMIT' }),
     reset: () => dispatch({ type: 'RESET' }),
+    signOut: () => dispatch({ type: 'SIGN_OUT' }),
     getStatus: (question) => {
       if (state.flags[question.id]) return 'flagged';
       if (state.answers[question.id]) return 'answered';
