@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BaseScreenProps, Screen } from '../types';
 import React from 'react';
-import { BookOpen, HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check } from 'lucide-react';
+import { HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { useExam } from '../context/ExamContext';
 import { Modal } from './Modal';
@@ -14,7 +14,6 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { id: 'exam', label: 'Take Exam', icon: <BookOpen className="w-5 h-5" /> },
   { id: 'review', label: 'Review Results', icon: <FileQuestion className="w-5 h-5" /> },
   { id: 'performance', label: 'Performance', icon: <BarChart2 className="w-5 h-5" /> },
   { id: 'support', label: 'Support', icon: <HelpCircle className="w-5 h-5" /> },
@@ -31,7 +30,7 @@ const PRO_FEATURES = [
 
 export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: Screen }) {
   const { theme, toggleTheme } = useTheme();
-  const { signOut, state } = useExam();
+  const { signOut } = useExam();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -42,15 +41,8 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
     setMenuOpen(false);
   };
 
-  const resolveNavTarget = (id: Screen): Screen => {
-    if (id !== 'exam') return id;
-    if (state.status === 'submitted') return 'review';
-    if (state.status === 'idle') return 'dashboard';
-    return 'exam';
-  };
-
   const navigateAndClose = (id: Screen) => {
-    onNavigate(resolveNavTarget(id));
+    onNavigate(id);
     setDrawerOpen(false);
   };
 
@@ -220,12 +212,12 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
 
             <div className="hidden md:flex gap-8 items-center">
               <nav aria-label="Quick links" className="flex gap-6">
-                {NAV_ITEMS.slice(0, 3).map((item) => {
+                {NAV_ITEMS.slice(0, 2).map((item) => {
                   const active = currentScreen === item.id;
                   return (
                     <button
                       key={item.id}
-                      onClick={() => onNavigate(resolveNavTarget(item.id))}
+                      onClick={() => onNavigate(item.id)}
                       aria-current={active ? 'page' : undefined}
                       className={`text-sm font-semibold transition-colors duration-200 ${
                         active
