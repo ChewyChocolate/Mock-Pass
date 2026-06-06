@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { BaseScreenProps } from '../types';
+import { useMemo, useState } from 'react';
+import { BaseScreenProps, QuestionTopic } from '../types';
 import {
   Timer,
   History,
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { PROFESSIONAL_SECTIONS } from '../data/questions';
+import { filterByTopic, topicProgress, type TopicFilter } from './examNavigator';
 
 function formatTime(seconds: number) {
   const h = Math.floor(seconds / 3600);
@@ -25,12 +27,84 @@ function formatTime(seconds: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function topicAccentClasses(topic: QuestionTopic): {
+  active: string;
+  badge: string;
+  ring: string;
+} {
+  if (topic === 'Verbal Ability')
+    return {
+      active: 'bg-primary text-on-primary border-primary',
+      badge: 'bg-primary-container text-primary',
+      ring: 'ring-primary',
+    };
+  if (topic === 'Analytical Reasoning')
+    return {
+      active: 'bg-tertiary text-on-tertiary border-tertiary',
+      badge: 'bg-tertiary-container text-tertiary',
+      ring: 'ring-tertiary',
+    };
+  if (topic === 'Numerical Ability')
+    return {
+      active: 'bg-terracotta text-white border-terracotta',
+      badge: 'bg-terracotta/15 text-terracotta',
+      ring: 'ring-terracotta',
+    };
+  return {
+    active: 'bg-secondary text-on-secondary border-secondary',
+    badge: 'bg-secondary-container text-secondary',
+    ring: 'ring-secondary',
+  };
+}
+
+function TopicTab({
+  label,
+  answered,
+  total,
+  active,
+  onClick,
+  accent,
+  ariaLabel,
+}: {
+  label: string;
+  answered: number;
+  total: number;
+  active: boolean;
+  onClick: () => void;
+  accent: { active: string; badge: string };
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={ariaLabel}
+      className={`flex-1 min-w-0 px-2 py-2 border text-[10px] font-bold uppercase tracking-widest rounded-sm transition-all flex items-center justify-center gap-1.5 ${
+        active
+          ? accent.active
+          : 'bg-surface-container border-outline-variant/40 text-on-surface-variant hover:border-primary/40 hover:text-on-surface'
+      }`}
+    >
+      <span className="truncate">{label}</span>
+      <span
+        className={`shrink-0 font-mono px-1.5 py-0.5 rounded-sm ${
+          active ? 'bg-black/15' : accent.badge
+        }`}
+      >
+        {answered}/{total}
+      </span>
+    </button>
+  );
+}
+
 export default function ExamScreen({ onNavigate }: BaseScreenProps) {
   const exam = useExam();
   const { state, start, selectAnswer, toggleFlag, goTo, next, prev, submit, reset, getStatus } = exam;
   const { currentQuestion, isFirst, isLast, answeredCount, flaggedCount } = exam;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showNavigator, setShowNavigator] = useState(false);
+  const [topicFilter, setTopicFilter] = useState<TopicFilter>('all');
   const confirmRef = useFocusTrap<HTMLDivElement>(showConfirm);
   const navigatorRef = useFocusTrap<HTMLDivElement>(showNavigator);
 
@@ -40,6 +114,53 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
   const currentStatus = getStatus(currentQuestion);
   const isFlagged = state.flags[currentQuestion.id] === true;
   const selectedOption = state.answers[currentQuestion.id] ?? null;
+
+  const progress = useMemo(
+    () => topicProgress(state.questions, state.answers),
+    [state.questions, state.answers],
+  );
+
+  const visibleQuestions = useMemo(
+    () => filterByTopic(state.questions, topicFilter),
+    [state.questions, topicFilter],
+  );
+
+  const renderTopicTabs = (compact: boolean) => {
+    const allAccent = {
+      active: 'bg-on-surface text-surface border-on-surface',
+      badge: 'bg-surface-container-highest text-on-surface-variant',
+    };
+    return (
+      <div className={compact ? 'mb-4 space-y-2' : 'mb-3 space-y-2'}>
+        <TopicTab
+          label="All"
+          answered={answeredCount}
+          total={total}
+          active={topicFilter === 'all'}
+          onClick={() => setTopicFilter('all')}
+          accent={allAccent}
+          ariaLabel="Show all questions"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          {PROFESSIONAL_SECTIONS.map((section) => {
+            const sectionProgress = progress[section.topic];
+            return (
+              <TopicTab
+                key={section.topic}
+                label={section.topic === 'General Information' ? 'General' : section.topic.replace(' Ability', '').replace(' Reasoning', '')}
+                answered={sectionProgress.answered}
+                total={sectionProgress.total}
+                active={topicFilter === section.topic}
+                onClick={() => setTopicFilter(section.topic)}
+                accent={topicAccentClasses(section.topic)}
+                ariaLabel={`Show only ${section.topic} questions`}
+              />
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   if (state.status === 'idle') {
     return (
@@ -168,36 +289,44 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-surface-container-low/50">
-            <div className="grid grid-cols-5 gap-2">
-                {state.questions.map((q, idx) => {
-                const status = getStatus(q);
-                const isCurrent = idx === state.currentIndex;
-                return (
-                  <button
-                    key={q.id}
-                    onClick={() => goTo(idx)}
-                    aria-current={isCurrent ? 'true' : undefined}
-                    aria-label={`Item ${idx + 1}, ${status}`}
-                    className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
-                      ${
-                        isCurrent
-                          ? 'border-primary ring-1 ring-primary ring-offset-1 ring-offset-surface-container-low bg-secondary-container text-on-surface'
-                          : status === 'answered'
-                          ? 'bg-secondary-container text-on-secondary-container border-transparent hover:border-primary/50 transition-all'
-                          : status === 'flagged'
-                          ? 'bg-terracotta/10 text-terracotta border-terracotta/30'
-                          : 'bg-surface-container-highest text-on-surface-variant border-transparent hover:border-primary/30 transition-all'
-                      }
-                    `}
-                  >
-                    {String(idx + 1).padStart(2, '0')}
-                    {status === 'flagged' && (
-                      <Bookmark className="absolute -top-1 -right-1 w-3 h-3 text-terracotta fill-terracotta" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {renderTopicTabs(false)}
+            {visibleQuestions.length === 0 ? (
+              <p className="text-center text-xs text-on-surface-variant py-8">
+                No questions in this section.
+              </p>
+            ) : (
+              <div className="grid grid-cols-5 gap-2">
+                {visibleQuestions.map((q) => {
+                  const idx = state.questions.indexOf(q);
+                  const status = getStatus(q);
+                  const isCurrent = idx === state.currentIndex;
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => goTo(idx)}
+                      aria-current={isCurrent ? 'true' : undefined}
+                      aria-label={`Item ${idx + 1}, ${status}`}
+                      className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
+                        ${
+                          isCurrent
+                            ? 'border-primary ring-1 ring-primary ring-offset-1 ring-offset-surface-container-low bg-secondary-container text-on-surface'
+                            : status === 'answered'
+                            ? 'bg-secondary-container text-on-secondary-container border-transparent hover:border-primary/50 transition-all'
+                            : status === 'flagged'
+                            ? 'bg-terracotta/10 text-terracotta border-terracotta/30'
+                            : 'bg-surface-container-highest text-on-surface-variant border-transparent hover:border-primary/30 transition-all'
+                        }
+                      `}
+                    >
+                      {String(idx + 1).padStart(2, '0')}
+                      {status === 'flagged' && (
+                        <Bookmark className="absolute -top-1 -right-1 w-3 h-3 text-terracotta fill-terracotta" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </aside>
 
@@ -437,39 +566,47 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="grid grid-cols-5 gap-2">
-              {state.questions.map((q, idx) => {
-                const status = getStatus(q);
-                const isCurrent = idx === state.currentIndex;
-                return (
-                  <button
-                    key={q.id}
-                    onClick={() => {
-                      goTo(idx);
-                      setShowNavigator(false);
-                    }}
-                    aria-current={isCurrent ? 'true' : undefined}
-                    aria-label={`Item ${idx + 1}, ${status}`}
-                    className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
-                      ${
-                        isCurrent
-                          ? 'border-primary ring-1 ring-primary bg-secondary-container text-on-surface'
-                          : status === 'answered'
-                          ? 'bg-secondary-container text-on-secondary-container border-transparent'
-                          : status === 'flagged'
-                          ? 'bg-terracotta/10 text-terracotta border-terracotta/30'
-                          : 'bg-surface-container-highest text-on-surface-variant border-transparent'
-                      }
-                    `}
-                  >
-                    {String(idx + 1).padStart(2, '0')}
-                    {status === 'flagged' && (
-                      <Bookmark className="absolute -top-1 -right-1 w-3 h-3 text-terracotta fill-terracotta" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {renderTopicTabs(true)}
+            {visibleQuestions.length === 0 ? (
+              <p className="text-center text-sm text-on-surface-variant py-12">
+                No questions in this section.
+              </p>
+            ) : (
+              <div className="grid grid-cols-5 gap-2">
+                {visibleQuestions.map((q) => {
+                  const idx = state.questions.indexOf(q);
+                  const status = getStatus(q);
+                  const isCurrent = idx === state.currentIndex;
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => {
+                        goTo(idx);
+                        setShowNavigator(false);
+                      }}
+                      aria-current={isCurrent ? 'true' : undefined}
+                      aria-label={`Item ${idx + 1}, ${status}`}
+                      className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
+                        ${
+                          isCurrent
+                            ? 'border-primary ring-1 ring-primary bg-secondary-container text-on-surface'
+                            : status === 'answered'
+                            ? 'bg-secondary-container text-on-secondary-container border-transparent'
+                            : status === 'flagged'
+                            ? 'bg-terracotta/10 text-terracotta border-terracotta/30'
+                            : 'bg-surface-container-highest text-on-surface-variant border-transparent'
+                        }
+                      `}
+                    >
+                      {String(idx + 1).padStart(2, '0')}
+                      {status === 'flagged' && (
+                        <Bookmark className="absolute -top-1 -right-1 w-3 h-3 text-terracotta fill-terracotta" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

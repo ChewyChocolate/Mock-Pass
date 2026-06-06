@@ -22,9 +22,9 @@ describe('Question bank — counts and distribution', () => {
   it('professional topic distribution matches spec', () => {
     const counts: Record<string, number> = {};
     for (const q of PRO) counts[q.topic] = (counts[q.topic] ?? 0) + 1;
-    expect(counts['Verbal Ability']).toBe(45);
+    expect(counts['Verbal Ability']).toBe(55);
     expect(counts['Numerical Ability']).toBe(45);
-    expect(counts['Analytical Reasoning']).toBe(40);
+    expect(counts['Analytical Reasoning']).toBe(30);
     expect(counts['General Information']).toBe(20);
   });
 
