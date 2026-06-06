@@ -21,8 +21,9 @@ import {
   durationForLevel,
   getQuestionsForLevel,
   WEIGHTED_SECTION_TOPICS,
+  buildTopicStats,
 } from '../data/questions';
-import { generateSeed, seededShuffle, groupedShuffle } from '../utils/random';
+import { generateSeed, groupedShuffle } from '../utils/random';
 
 const STORAGE_KEY = 'mockpass:exam:v2';
 const LEGACY_KEY = 'mockpass:exam:v1';
@@ -135,17 +136,8 @@ function reducer(state: ExamState, action: Action): ExamState {
     case 'SUBMIT': {
       if (state.status !== 'in-progress') return state;
       const submittedAt = Date.now();
-      const topicStats: Record<string, { correct: number; total: number }> = {};
-      let correct = 0;
-      for (const q of state.questions) {
-        const entry = topicStats[q.topic] ?? { correct: 0, total: 0 };
-        entry.total += 1;
-        if (state.answers[q.id] === q.correctOptionId) {
-          entry.correct += 1;
-          correct += 1;
-        }
-        topicStats[q.topic] = entry;
-      }
+      const topicStats = buildTopicStats(state.questions, state.answers);
+      const correct = Object.values(topicStats).reduce((sum, s) => sum + s.correct, 0);
       const score = calculateScore(state.level, topicStats);
       const timeSpentSeconds = state.startedAt
         ? Math.min(
@@ -308,17 +300,8 @@ export function ExamProvider({ children }: { children: ReactNode }) {
   }, [state.status, state.timeLeft]);
 
   const { correctCount, score, answeredCount, flaggedCount } = useMemo(() => {
-    let correct = 0;
-    const topicStats: Record<string, { correct: number; total: number }> = {};
-    for (const q of state.questions) {
-      const entry = topicStats[q.topic] ?? { correct: 0, total: 0 };
-      entry.total += 1;
-      if (state.answers[q.id] === q.correctOptionId) {
-        entry.correct += 1;
-        correct += 1;
-      }
-      topicStats[q.topic] = entry;
-    }
+    const topicStats = buildTopicStats(state.questions, state.answers);
+    const correct = Object.values(topicStats).reduce((sum, s) => sum + s.correct, 0);
     return {
       correctCount: correct,
       score: state.questions.length === 0

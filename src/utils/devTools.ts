@@ -1,27 +1,31 @@
-const STORAGE_KEY = 'mockpass:exam:v2';
+import { calculateScore, getQuestionsForLevel, migrateSessionScore, PASSING_SCORE } from '../data/questions';
 
-const WEIGHTS: Record<string, number> = {
-  'Verbal Ability': 0.30,
-  'Analytical Reasoning': 0.35,
-  'Numerical Ability': 0.30,
-  'General Information': 0.05,
-  'Clerical Ability': 0,
-};
-const TOPIC_ORDER = ['Verbal Ability', 'Analytical Reasoning', 'Numerical Ability', 'General Information'];
-const PASSING_SCORE = 80;
-const OPTIONS = ['A', 'B', 'C', 'D'];
+const STORAGE_KEY = 'mockpass:exam:v2';
+const OPTIONS = ['A', 'B', 'C', 'D'] as const;
+
+type OptionId = (typeof OPTIONS)[number];
+
+interface PersistedQuestion {
+  id: string;
+  topic: string;
+  correctOptionId: string;
+}
 
 interface PersistedState {
   status: string;
-  questions: { id: string; topic: string; correctOptionId: string }[];
+  questions: PersistedQuestion[];
   answers: Record<string, string>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 function loadState(): PersistedState | null {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  return JSON.parse(raw);
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedState;
+  } catch {
+    return null;
+  }
 }
 
 function saveAndReload(state: PersistedState, count: number) {
@@ -30,7 +34,7 @@ function saveAndReload(state: PersistedState, count: number) {
   location.reload();
 }
 
-function computeScore(questions: PersistedState['questions'], answers: Record<string, string>): number {
+function computeScore(questions: PersistedQuestion[], answers: Record<string, string>): number {
   const topicStats: Record<string, { correct: number; total: number }> = {};
   for (const q of questions) {
     const entry = topicStats[q.topic] ?? { correct: 0, total: 0 };
@@ -38,22 +42,16 @@ function computeScore(questions: PersistedState['questions'], answers: Record<st
     if (answers[q.id] === q.correctOptionId) entry.correct += 1;
     topicStats[q.topic] = entry;
   }
-  let weightedSum = 0;
-  for (const topic of TOPIC_ORDER) {
-    const stat = topicStats[topic];
-    if (!stat || stat.total === 0) continue;
-    weightedSum += (stat.correct / stat.total) * 100 * (WEIGHTS[topic] ?? 0);
-  }
-  return Math.round(weightedSum);
+  return calculateScore('professional', topicStats);
 }
 
-function randomOption(): string {
-  return OPTIONS[Math.floor(Math.random() * 4)];
+function randomOption(): OptionId {
+  return OPTIONS[Math.floor(Math.random() * OPTIONS.length)];
 }
 
-function wrongOption(correct: string): string {
-  const wrong = OPTIONS.filter(o => o !== correct);
-  return wrong[Math.floor(Math.random() * wrong.length)];
+function wrongOption(correct: string): OptionId {
+  const wrong = OPTIONS.filter((o) => o !== correct);
+  return wrong[Math.floor(Math.random() * wrong.length)]!;
 }
 
 export function autoFillCorrect() {
@@ -91,7 +89,7 @@ export function autoFillFail() {
   let score = computeScore(state.questions, answers);
 
   while (score >= PASSING_SCORE) {
-    const correctQ = state.questions.find(q => answers[q.id] === q.correctOptionId);
+    const correctQ = state.questions.find((q) => answers[q.id] === q.correctOptionId);
     if (!correctQ) break;
     answers[correctQ.id] = wrongOption(correctQ.correctOptionId);
     score = computeScore(state.questions, answers);
@@ -113,7 +111,7 @@ export function autoFillPass() {
   let score = computeScore(state.questions, answers);
 
   while (score < PASSING_SCORE) {
-    const wrongQ = state.questions.find(q => answers[q.id] !== q.correctOptionId);
+    const wrongQ = state.questions.find((q) => answers[q.id] !== q.correctOptionId);
     if (!wrongQ) break;
     answers[wrongQ.id] = wrongQ.correctOptionId;
     score = computeScore(state.questions, answers);
@@ -124,10 +122,18 @@ export function autoFillPass() {
   saveAndReload(state, state.questions.length);
 }
 
-if (typeof window !== 'undefined') {
-  (window as any).autoFill = autoFillCorrect;
-  (window as any).autoFillCorrect = autoFillCorrect;
-  (window as any).autoFillRandom = autoFillRandom;
-  (window as any).autoFillFail = autoFillFail;
-  (window as any).autoFillPass = autoFillPass;
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { mockpass: unknown }).mockpass = {
+    autoFillCorrect,
+    autoFillRandom,
+    autoFillFail,
+    autoFillPass,
+    getQuestionsForLevel,
+    migrateSessionScore,
+  };
+  console.info(
+    '[mockpass devTools] window.mockpass helpers attached. ' +
+      'Available: autoFillCorrect, autoFillRandom, autoFillFail, autoFillPass, ' +
+      'getQuestionsForLevel, migrateSessionScore.',
+  );
 }

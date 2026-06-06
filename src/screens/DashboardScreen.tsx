@@ -81,7 +81,7 @@ const LEVEL_OPTIONS: LevelOption[] = [
   {
     id: 'professional',
     label: 'Professional',
-    description: 'For second-level government positions. 150 items divided across 4 weighted sections.',
+    description: `For second-level government positions. ${PROFESSIONAL_QUESTION_COUNT} items divided across 4 weighted sections.`,
     icon: <GraduationCap className="w-5 h-5" />,
     questions: PROFESSIONAL_QUESTION_COUNT,
     durationSeconds: PRO_DURATION_SECONDS,
@@ -174,22 +174,30 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
               </div>
             </div>
             <div className="h-10 flex items-end gap-1 opacity-80 mt-4">
-              {(history.slice(0, 5).reverse().length
-                ? history.slice(0, 5).reverse()
-                : [0, 0, 0, 0, 0]
-              ).map((s, i) => {
-                const pct = typeof s === 'number' ? 0 : s.score;
-                const heights = ['h-4', 'h-6', 'h-8', 'h-10', 'h-7'];
-                const opacities = ['bg-primary/20', 'bg-primary/30', 'bg-primary/40', 'bg-primary', 'bg-primary/60'];
-                return (
-                  <div
-                    key={i}
-                    className={`flex-1 ${heights[i]} ${opacities[i]} ${
-                      hasHistory ? '' : 'opacity-50'
-                    }`}
-                  ></div>
-                );
-              })}
+              {hasHistory
+                ? history
+                    .slice(0, 5)
+                    .reverse()
+                    .map((s, i, arr) => {
+                      const heightPct = Math.max(8, Math.min(100, s.score));
+                      const recency = i / Math.max(1, arr.length - 1);
+                      const opacity = 0.25 + recency * 0.75;
+                      return (
+                        <div
+                          key={s.id}
+                          className="flex-1 rounded-sm bg-primary"
+                          style={{ height: `${heightPct}%`, opacity }}
+                          title={`Session: ${s.score}%`}
+                        ></div>
+                      );
+                    })
+                : [0, 0, 0, 0, 0].map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 bg-primary/20 opacity-50 rounded-sm"
+                      style={{ height: '40%' }}
+                    ></div>
+                  ))}
             </div>
           </div>
 

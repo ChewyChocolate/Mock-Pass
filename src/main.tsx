@@ -2,7 +2,10 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import './utils/devTools';
+
+if (import.meta.env.DEV) {
+  import('./utils/devTools');
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

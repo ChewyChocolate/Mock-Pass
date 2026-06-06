@@ -27,6 +27,13 @@ function formatTime(seconds: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function formatDurationCompact(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
 function topicAccentClasses(topic: QuestionTopic): {
   active: string;
   badge: string;
@@ -168,7 +175,7 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
         <div className="bg-surface-container border border-outline-variant p-10 max-w-md w-full text-center rounded shadow-sm">
           <h2 className="text-2xl font-bold mb-3 tracking-tight">Ready to begin?</h2>
           <p className="text-on-surface-variant mb-8">
-            {total} questions · {Math.floor(state.timeLeft / 60)} minutes
+            {total} questions · {formatDurationCompact(state.timeLeft)} duration
           </p>
           <div className="flex flex-col gap-3">
             <button

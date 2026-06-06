@@ -1,4 +1,4 @@
-import type { ExamLevel, Question, QuestionTopic, TopicStat } from '../types';
+import type { ExamLevel, Question, QuestionOption, QuestionTopic, TopicStat } from '../types';
 import PROFESSIONAL_QUESTIONS from './questions/professionalQuestions';
 import SUB_PROFESSIONAL_QUESTIONS from './questions/subProfessionalQuestions';
 
@@ -42,12 +42,41 @@ if (Math.abs(weightedTotal - 1.0) > 1e-9) {
   );
 }
 
+const totalItemsAcrossSections = PROFESSIONAL_SECTIONS.reduce((sum, s) => sum + s.count, 0);
+if (totalItemsAcrossSections !== PROFESSIONAL_QUESTIONS.length) {
+  throw new Error(
+    `PROFESSIONAL_SECTIONS counts (${totalItemsAcrossSections}) do not match ` +
+      `PROFESSIONAL_QUESTIONS.length (${PROFESSIONAL_QUESTIONS.length}). ` +
+      'Some questions are assigned to a topic outside WEIGHTED_SECTION_TOPICS, ' +
+      'or the bank has duplicates/missing items.',
+  );
+}
+
 export function durationForLevel(level: ExamLevel): number {
   return level === 'professional' ? PRO_DURATION_SECONDS : SUB_PRO_DURATION_SECONDS;
 }
 
 export function getQuestionsForLevel(level: ExamLevel): Question[] {
   return level === 'professional' ? PROFESSIONAL_QUESTIONS : SUB_PROFESSIONAL_QUESTIONS;
+}
+
+/**
+ * Walk the question set once and produce per-topic correct/total tallies.
+ * Shared by the live `useMemo` in `ExamProvider` and the reducer's `SUBMIT`
+ * case so the two paths cannot drift.
+ */
+export function buildTopicStats(
+  questions: readonly Question[],
+  answers: Readonly<Record<string, QuestionOption['id']>>,
+): Record<string, TopicStat> {
+  const stats: Record<string, TopicStat> = {};
+  for (const q of questions) {
+    const entry = stats[q.topic] ?? { correct: 0, total: 0 };
+    entry.total += 1;
+    if (answers[q.id] === q.correctOptionId) entry.correct += 1;
+    stats[q.topic] = entry;
+  }
+  return stats;
 }
 
 export function calculateScore(

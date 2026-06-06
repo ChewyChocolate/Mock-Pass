@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BaseScreenProps } from '../types';
-import { Mail, Lock, Eye, ArrowRight, PenTool, Sun, Moon } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, PenTool, Sun, Moon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useTheme } from '../ThemeContext';
 
 export default function LoginScreen({ onNavigate }: BaseScreenProps) {
   const { theme, toggleTheme } = useTheme();
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleForgotKey = () => {
+    window.alert('Password recovery is not available in this preview build.');
+  };
   
   return (
     <div className="bg-surface text-on-surface font-sans min-h-screen flex items-center justify-center p-4 md:p-16 cse-pattern overflow-hidden relative">
@@ -52,18 +57,24 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
             <div className="space-y-2 group">
               <div className="flex justify-between items-end ml-1">
                 <label className="text-xs font-semibold tracking-widest text-on-surface-variant uppercase" htmlFor="password">Access Key (Password)</label>
-                <button type="button" className="text-xs font-semibold text-primary hover:text-primary-fixed-dim transition-colors uppercase">Forgot Key?</button>
+                <button type="button" onClick={handleForgotKey} className="text-xs font-semibold text-primary hover:text-primary-fixed-dim transition-colors uppercase">Forgot Key?</button>
               </div>
               <div className="relative custom-focus transition-all duration-300 border border-outline-variant rounded bg-surface-container-low overflow-hidden">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="text-outline w-5 h-5" />
                 </div>
-                <input 
-                  className="input-textured w-full bg-transparent border-none pl-10 pr-12 py-3 text-on-surface placeholder:text-outline/50 focus:outline-none focus:ring-0 text-base" 
-                  id="password" type="password" placeholder="••••••••" required defaultValue="password"
+                <input
+                  className="input-textured w-full bg-transparent border-none pl-10 pr-12 py-3 text-on-surface placeholder:text-outline/50 focus:outline-none focus:ring-0 text-base"
+                  id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" required defaultValue="password"
                 />
-                <button className="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface transition-colors" type="button">
-                  <Eye className="w-5 h-5" />
+                <button
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface transition-colors"
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
