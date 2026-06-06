@@ -3,7 +3,7 @@ import { BaseScreenProps, Screen } from '../types';
 import React from 'react';
 import { HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
-import { useExam } from '../context/ExamContext';
+import { useAuth } from '../context/AuthContext';
 import { Modal } from './Modal';
 
 interface NavItem {
@@ -30,15 +30,34 @@ const PRO_FEATURES = [
 
 export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: Screen }) {
   const { theme, toggleTheme } = useTheme();
-  const { signOut } = useExam();
+  const { signOut: authSignOut, user } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  const initials = (() => {
+    const email = user?.email ?? '';
+    if (!email) return 'MP';
+    const [local] = email.split('@');
+    const cleaned = local.replace(/[^a-z0-9]/gi, '');
+    return cleaned.slice(0, 2).toUpperCase() || 'MP';
+  })();
 
   const closeUpgrade = () => setUpgradeOpen(false);
   const closeMenus = () => {
     setDrawerOpen(false);
     setMenuOpen(false);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await authSignOut();
+    } catch (err) {
+      console.error('[mockpass] sign-out failed', err);
+    } finally {
+      closeMenus();
+      onNavigate('login');
+    }
   };
 
   const navigateAndClose = (id: Screen) => {
@@ -254,7 +273,7 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                     aria-expanded={menuOpen}
                     aria-label="User menu"
                   >
-                    <span className="text-xs uppercase font-bold text-on-secondary">AX</span>
+                    <span className="text-xs uppercase font-bold text-on-secondary">{initials}</span>
                   </button>
                   {menuOpen && (
                     <>
@@ -264,8 +283,10 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                         className="absolute right-0 top-10 w-56 bg-surface-container border border-outline-variant rounded shadow-xl z-50 overflow-hidden"
                       >
                         <div className="px-4 py-3 border-b border-outline-variant">
-                          <p className="text-sm font-bold text-on-surface">Alex Aspirant</p>
-                          <p className="text-xs text-on-surface-variant">aspirant@gov.ph</p>
+                          <p className="text-sm font-bold text-on-surface">
+                            {user?.email ?? 'Signed in'}
+                          </p>
+                          <p className="text-xs text-on-surface-variant">authenticated</p>
                         </div>
                         <button
                           role="menuitem"
@@ -277,11 +298,7 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                         </button>
                         <button
                           role="menuitem"
-                          onClick={() => {
-                            signOut();
-                            closeMenus();
-                            onNavigate('login');
-                          }}
+                          onClick={handleSignOut}
                           className="w-full px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-variant flex items-center gap-2 border-t border-outline-variant"
                         >
                           <LogOut className="w-4 h-4" />
@@ -309,7 +326,7 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                 aria-expanded={menuOpen}
                 aria-label="User menu"
               >
-                <span className="text-xs uppercase font-bold text-on-secondary">AX</span>
+                <span className="text-xs uppercase font-bold text-on-secondary">{initials}</span>
               </button>
             </div>
           </div>

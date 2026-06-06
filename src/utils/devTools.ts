@@ -130,10 +130,37 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     autoFillPass,
     getQuestionsForLevel,
     migrateSessionScore,
+    history: {
+      local: () => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const parsed = raw ? JSON.parse(raw) : null;
+          const h = parsed?.history;
+          return Array.isArray(h) ? { count: h.length, sessions: h } : { count: 0, sessions: [] };
+        } catch (err) {
+          return { error: String(err) };
+        }
+      },
+      remote: async () => {
+        try {
+          const mod = await import('../lib/supabase');
+          if (!mod.isSupabaseConfigured()) return { error: 'supabase not configured' };
+          const devAuthMod = await import('./devAuth');
+          const user = devAuthMod.peekSignedInUser();
+          if (!user) return { error: 'not signed in' };
+          const syncMod = await import('../lib/sync');
+          const result = await syncMod.fetchRemoteHistory(mod.getSupabaseClient(), user.id);
+          if (!result.ok) return { error: result.error };
+          return { count: result.history.length, sessions: result.history };
+        } catch (err) {
+          return { error: String(err) };
+        }
+      },
+    },
   };
   console.info(
     '[mockpass devTools] window.mockpass helpers attached. ' +
       'Available: autoFillCorrect, autoFillRandom, autoFillFail, autoFillPass, ' +
-      'getQuestionsForLevel, migrateSessionScore.',
+      'getQuestionsForLevel, migrateSessionScore, history.local(), history.remote().',
   );
 }

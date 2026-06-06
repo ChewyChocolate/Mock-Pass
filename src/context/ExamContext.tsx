@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   type ReactNode,
 } from 'react';
 import type {
@@ -24,6 +25,9 @@ import {
   buildTopicStats,
 } from '../data/questions';
 import { generateSeed, groupedShuffle } from '../utils/random';
+import { useAuth } from './AuthContext';
+import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
+import { fetchRemoteHistory, pushSession } from '../lib/sync';
 
 const STORAGE_KEY = 'mockpass:exam:v2';
 const LEGACY_KEY = 'mockpass:exam:v1';
@@ -55,7 +59,9 @@ type Action =
   | { type: 'SUBMIT' }
   | { type: 'RESET' }
   | { type: 'SIGN_OUT' }
-  | { type: 'HYDRATE'; payload: Partial<ExamState> };
+  | { type: 'HYDRATE'; payload: Partial<ExamState> }
+  | { type: 'HYDRATE_HISTORY'; history: ExamSessionSummary[] }
+  | { type: 'DISCARD_HISTORY' };
 
 const DEFAULT_LEVEL: ExamLevel = 'professional';
 
@@ -180,6 +186,10 @@ function reducer(state: ExamState, action: Action): ExamState {
       };
     case 'HYDRATE':
       return { ...state, ...action.payload };
+    case 'HYDRATE_HISTORY':
+      return { ...state, history: action.history };
+    case 'DISCARD_HISTORY':
+      return { ...state, history: [] };
     default:
       return state;
   }
@@ -261,6 +271,8 @@ function migrateLegacy() {
 }
 
 export function ExamProvider({ children }: { children: ReactNode }) {
+  const { user, isSignedIn, isConfigured: authConfigured } = useAuth();
+
   const [state, dispatch] = useReducer(reducer, initialState, (init) => {
     migrateLegacy();
     const persisted = loadPersisted();
@@ -298,6 +310,63 @@ export function ExamProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SUBMIT' });
     }
   }, [state.status, state.timeLeft]);
+
+  // ── Backend sync: discard local history on first sign-in, then fetch remote.
+  const lastSyncedUserId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!authConfigured || !isSupabaseConfigured()) return;
+    if (!isSignedIn || !user) {
+      lastSyncedUserId.current = null;
+      return;
+    }
+    if (lastSyncedUserId.current === user.id) return;
+    lastSyncedUserId.current = user.id;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const client = getSupabaseClient();
+        // First sign-in: drop the local cache so remote becomes the only source of truth.
+        dispatch({ type: 'DISCARD_HISTORY' });
+        const result = await fetchRemoteHistory(client, user.id);
+        if (cancelled) return;
+        if (result.ok) {
+          dispatch({ type: 'HYDRATE_HISTORY', history: result.history });
+        } else {
+          console.warn('[mockpass] fetchRemoteHistory failed:', result.error);
+        }
+      } catch (err) {
+        console.warn('[mockpass] sync init failed:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authConfigured, isSignedIn, user]);
+
+  // ── Push newly-submitted sessions to the backend.
+  const lastPushedSessionId = useRef<string | null>(null);
+  useEffect(() => {
+    const latest = state.history[0];
+    if (!latest) return;
+    if (lastPushedSessionId.current === latest.id) return;
+    lastPushedSessionId.current = latest.id;
+    if (!isSignedIn || !user) return;
+    if (!isSupabaseConfigured()) return;
+
+    (async () => {
+      try {
+        const client = getSupabaseClient();
+        const result = await pushSession(client, user.id, latest);
+        if (!result.ok) {
+          console.warn('[mockpass] pushSession failed:', result.error);
+        }
+      } catch (err) {
+        console.warn('[mockpass] push session failed:', err);
+      }
+    })();
+  }, [state.history, isSignedIn, user]);
 
   const { correctCount, score, answeredCount, flaggedCount } = useMemo(() => {
     const topicStats = buildTopicStats(state.questions, state.answers);
