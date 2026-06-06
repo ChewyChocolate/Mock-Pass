@@ -17,7 +17,7 @@ export const PROFESSIONAL_TOPIC_WEIGHTS: Record<QuestionTopic, number> = {
   'Clerical Ability': 0,
 };
 
-const WEIGHTED_SECTION_TOPICS: QuestionTopic[] = [
+export const WEIGHTED_SECTION_TOPICS: QuestionTopic[] = [
   'Verbal Ability',
   'Analytical Reasoning',
   'Numerical Ability',

@@ -27,6 +27,30 @@ export function seededShuffle<T>(arr: T[], seed: number): T[] {
   return result;
 }
 
+export function groupedShuffle<T>(arr: T[], seed: number, groupKey: (item: T) => string, groupOrder: string[]): T[] {
+  const rng = mulberry32(seed);
+  const groups = new Map<string, T[]>();
+  for (const item of arr) {
+    const key = groupKey(item);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(item);
+  }
+  for (const group of groups.values()) {
+    for (let i = group.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const tmp = group[i]!;
+      group[i] = group[j]!;
+      group[j] = tmp;
+    }
+  }
+  const result: T[] = [];
+  for (const key of groupOrder) {
+    const group = groups.get(key);
+    if (group) result.push(...group);
+  }
+  return result;
+}
+
 export function generateSeed(): number {
   return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
 }

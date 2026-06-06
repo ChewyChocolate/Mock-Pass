@@ -20,8 +20,9 @@ import {
   migrateSessionScore,
   durationForLevel,
   getQuestionsForLevel,
+  WEIGHTED_SECTION_TOPICS,
 } from '../data/questions';
-import { generateSeed, seededShuffle } from '../utils/random';
+import { generateSeed, seededShuffle, groupedShuffle } from '../utils/random';
 
 const STORAGE_KEY = 'mockpass:exam:v2';
 const LEGACY_KEY = 'mockpass:exam:v1';
@@ -98,7 +99,7 @@ function reducer(state: ExamState, action: Action): ExamState {
         answers: {},
         flags: {},
         sessionSeed,
-        questions: seededShuffle(getQuestionsForLevel(state.level), sessionSeed),
+        questions: groupedShuffle(getQuestionsForLevel(state.level), sessionSeed, (q) => q.topic, WEIGHTED_SECTION_TOPICS),
       };
     }
     case 'SELECT_ANSWER':
