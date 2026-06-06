@@ -1,24 +1,6 @@
 import { ExamSessionSummary } from '../types';
-
-export function pctColorClass(pct: number): string {
-  if (pct >= 80) return 'text-tertiary';
-  if (pct >= 60) return 'text-primary';
-  return 'text-error';
-}
-
-export function dotColorClass(pct: number): string {
-  if (pct >= 80) return 'bg-tertiary shadow-[0_0_8px_rgba(78,222,163,0.5)]';
-  if (pct >= 60) return 'bg-primary shadow-[0_0_8px_rgba(190,198,224,0.5)]';
-  return 'bg-error shadow-[0_0_8px_rgba(255,180,171,0.5)]';
-}
-
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+import { dotColorClass, pctColorClass } from '../utils/scoreColors';
+import { formatDate } from '../utils/format';
 
 type Variant = 'table' | 'list';
 

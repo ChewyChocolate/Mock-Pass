@@ -1,6 +1,9 @@
 import React from 'react';
 import { BaseScreenProps } from '../types';
 import MainLayout from '../components/MainLayout';
+import { KpiCard } from '../components/KpiCard';
+import { SectionCard } from '../components/SectionCard';
+import { SectionHeader } from '../components/SectionHeader';
 import {
   TrendingUp,
   Trophy,
@@ -13,47 +16,8 @@ import {
 import { useExam } from '../context/ExamContext';
 import { PASSING_SCORE } from '../data/questions';
 import { usePerformanceStats } from '../hooks/usePerformanceStats';
-
-function formatDate(ts: number) {
-  return new Date(ts).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-interface KpiProps {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-  hint?: string;
-  accent?: 'primary' | 'tertiary' | 'terracotta';
-}
-
-function Kpi({ label, value, icon, hint, accent = 'primary' }: KpiProps) {
-  const accentText = {
-    primary: 'text-primary',
-    tertiary: 'text-tertiary',
-    terracotta: 'text-terracotta',
-  }[accent];
-  return (
-    <div className="bg-surface-container-high p-6 border border-outline-variant rounded flex flex-col justify-between min-h-[150px]">
-      <div>
-        <div className="flex justify-between items-start mb-3">
-          <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-            {label}
-          </span>
-          <span className={accentText}>{icon}</span>
-        </div>
-        <div className="text-3xl md:text-4xl font-bold text-on-surface tracking-tighter">
-          {value}
-        </div>
-      </div>
-      {hint && (
-        <div className="text-xs text-on-surface-variant mt-3 font-medium">{hint}</div>
-      )}
-    </div>
-  );
-}
+import { formatDate, formatHours } from '../utils/format';
+import { pctBarClass, pctBarTextClass } from '../utils/scoreColors';
 
 function ScoreTrendChart({ points }: { points: { ts: number; score: number }[] }) {
   if (points.length === 0) return null;
@@ -200,60 +164,65 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Kpi
+          <KpiCard
             label="Average Score"
-            value={hasHistory ? `${stats.average}%` : '—'}
+            value={`${stats.average}%`}
             icon={<TrendingUp className="w-5 h-5" />}
+            empty={!hasHistory}
             hint={
               hasHistory
                 ? `Last 3 exams: ${stats.recentAvg}% (${stats.trendDelta >= 0 ? '+' : ''}${stats.trendDelta})`
                 : 'No data yet'
             }
-            accent="primary"
           />
-          <Kpi
+          <KpiCard
             label="Best Score"
-            value={hasHistory ? `${stats.best}%` : '—'}
+            value={`${stats.best}%`}
             icon={<Trophy className="w-5 h-5" />}
-            hint={hasHistory ? `${stats.totalExams} ${stats.totalExams === 1 ? 'session' : 'sessions'} total` : 'No data yet'}
             accent="tertiary"
+            empty={!hasHistory}
+            hint={
+              hasHistory
+                ? `${stats.totalExams} ${stats.totalExams === 1 ? 'session' : 'sessions'} total`
+                : 'No data yet'
+            }
           />
-          <Kpi
+          <KpiCard
             label="Pass Rate"
-            value={hasHistory ? `${stats.passRate}%` : '—'}
+            value={`${stats.passRate}%`}
             icon={<Target className="w-5 h-5" />}
-            hint={hasHistory ? `Passing threshold: ${PASSING_SCORE}%` : 'No data yet'}
             accent={hasHistory && stats.passRate >= 50 ? 'tertiary' : 'terracotta'}
+            empty={!hasHistory}
+            hint={hasHistory ? `Passing threshold: ${PASSING_SCORE}%` : 'No data yet'}
           />
-          <Kpi
+          <KpiCard
             label="Study Streak"
-            value={hasHistory ? `${stats.streak} day${stats.streak === 1 ? '' : 's'}` : '—'}
+            value={`${stats.streak} day${stats.streak === 1 ? '' : 's'}`}
             icon={<Flame className="w-5 h-5" />}
-            hint={hasHistory ? `${stats.totalHours}h total study time` : 'No data yet'}
             accent="terracotta"
+            empty={!hasHistory}
+            hint={hasHistory ? `${formatHours(stats.totalSeconds)} total study time` : 'No data yet'}
           />
         </div>
 
-        <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-primary" />
-                Score Trend
-              </h2>
-              <p className="text-xs text-on-surface-variant mt-1 uppercase tracking-widest">
-                Last {Math.min(history.length, 12)} sessions
-              </p>
-            </div>
-            {hasHistory && (
-              <div className="text-right">
-                <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant">
-                  Hours Studied
-                </p>
-                <p className="font-mono text-xl font-bold text-on-surface">{stats.totalHours}h</p>
-              </div>
-            )}
-          </div>
+        <SectionCard>
+          <SectionHeader
+            icon={<BarChart3 className="w-5 h-5 text-primary" />}
+            title="Score Trend"
+            subtitle={`Last ${Math.min(history.length, 12)} sessions`}
+            trailing={
+              hasHistory ? (
+                <div className="text-right">
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant">
+                    Hours Studied
+                  </p>
+                  <p className="font-mono text-xl font-bold text-on-surface">
+                    {formatHours(stats.totalSeconds)}
+                  </p>
+                </div>
+              ) : null
+            }
+          />
 
           {!hasHistory ? (
             <div className="py-16 text-center">
@@ -272,17 +241,15 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
           ) : (
             <ScoreTrendChart points={stats.trend} />
           )}
-        </section>
+        </SectionCard>
 
         {hasHistory && stats.topicMastery.length > 0 && (
-          <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
-            <div className="flex items-center gap-2 mb-6">
-              <Award className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-bold tracking-tight">Topic Mastery</h2>
-            </div>
-            <p className="text-xs text-on-surface-variant uppercase tracking-widest mb-6">
-              Aggregated across all sessions
-            </p>
+          <SectionCard>
+            <SectionHeader
+              icon={<Award className="w-5 h-5 text-primary" />}
+              title="Topic Mastery"
+              subtitle="Aggregated across all sessions"
+            />
             <div className="space-y-5">
               {stats.topicMastery.map((row) => {
                 const good = row.pct >= 80;
@@ -290,13 +257,13 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
                   <div key={row.topic}>
                     <div className="flex justify-between mb-2">
                       <span className="text-sm font-medium">{row.topic}</span>
-                      <span className={`text-xs font-bold ${good ? 'text-primary' : 'text-error'}`}>
+                      <span className={`text-xs font-bold ${good ? pctBarTextClass(row.pct) : 'text-error'}`}>
                         {row.pct}% · {row.correct}/{row.total}
                       </span>
                     </div>
                     <div className="h-1.5 bg-outline-variant rounded-full overflow-hidden">
                       <div
-                        className={`h-full ${good ? 'bg-primary' : 'bg-error'}`}
+                        className={`h-full ${pctBarClass(row.pct)}`}
                         style={{ width: `${row.pct}%` }}
                       ></div>
                     </div>
@@ -304,15 +271,15 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
                 );
               })}
             </div>
-          </section>
+          </SectionCard>
         )}
 
         {hasHistory && stats.levelBreakdown.length > 1 && (
-          <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
-            <div className="flex items-center gap-2 mb-6">
-              <BarChart3 className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-bold tracking-tight">Performance by Level</h2>
-            </div>
+          <SectionCard>
+            <SectionHeader
+              icon={<BarChart3 className="w-5 h-5 text-primary" />}
+              title="Performance by Level"
+            />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {stats.levelBreakdown.map((row) => (
                 <div key={row.level} className="p-5 border border-outline-variant rounded">
@@ -326,15 +293,15 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
                 </div>
               ))}
             </div>
-          </section>
+          </SectionCard>
         )}
 
         {hasHistory && (
-          <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
-            <div className="flex items-center gap-2 mb-6">
-              <Timer className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-bold tracking-tight">Time Analytics</h2>
-            </div>
+          <SectionCard>
+            <SectionHeader
+              icon={<Timer className="w-5 h-5 text-primary" />}
+              title="Time Analytics"
+            />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="p-4 border border-outline-variant rounded">
                 <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant mb-1">
@@ -361,7 +328,7 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
                 </p>
               </div>
             </div>
-          </section>
+          </SectionCard>
         )}
       </div>
     </MainLayout>

@@ -3,8 +3,8 @@ import { BaseScreenProps, Screen } from '../types';
 import React from 'react';
 import { BookOpen, HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
-import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useExam } from '../context/ExamContext';
+import { Modal } from './Modal';
 
 interface NavItem {
   id: Screen;
@@ -35,7 +35,6 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const upgradeRef = useFocusTrap<HTMLDivElement>(upgradeOpen);
 
   const closeUpgrade = () => setUpgradeOpen(false);
   const closeMenus = () => {
@@ -131,95 +130,76 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
         </div>
       )}
 
-      {upgradeOpen && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          role="presentation"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') closeUpgrade();
-          }}
-        >
-          <div
-            ref={upgradeRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="upgrade-title"
-            className="bg-surface-container border border-outline-variant max-w-2xl w-full rounded shadow-2xl p-8 relative focus:outline-none max-h-[90vh] overflow-y-auto"
-          >
-            <button
-              onClick={closeUpgrade}
-              aria-label="Close upgrade dialog"
-              className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-primary-container border border-outline-variant flex items-center justify-center rounded-sm">
-                <Sparkles className="w-5 h-5 text-primary" />
-              </div>
-              <h2 id="upgrade-title" className="text-2xl font-bold tracking-tight">
-                Upgrade to Mock Pass Pro
-              </h2>
-            </div>
-            <p className="text-on-surface-variant mb-6">
-              Unlock your full review potential with unlimited exams and deep analytics.
-            </p>
+      <Modal
+        open={upgradeOpen}
+        onClose={closeUpgrade}
+        labelledBy="upgrade-title"
+        panelClassName="max-w-2xl"
+      >
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-primary-container border border-outline-variant flex items-center justify-center rounded-sm">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <h2 id="upgrade-title" className="text-2xl font-bold tracking-tight">
+            Upgrade to Mock Pass Pro
+          </h2>
+        </div>
+        <p className="text-on-surface-variant mb-6">
+          Unlock your full review potential with unlimited exams and deep analytics.
+        </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="border border-outline-variant rounded p-5">
-                <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant mb-1">
-                  Free
-                </p>
-                <p className="text-3xl font-bold text-on-surface mb-3">₱0</p>
-                <ul className="text-sm text-on-surface-variant space-y-2">
-                  <li>3 mock exams / month</li>
-                  <li>Basic review</li>
-                  <li>Standard timer</li>
-                </ul>
-              </div>
-              <div className="border-2 border-primary bg-primary-container/30 rounded p-5 relative">
-                <span className="absolute -top-2 right-4 bg-primary text-on-primary text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-sm">
-                  Most Popular
-                </span>
-                <p className="text-[10px] uppercase font-bold tracking-widest text-primary mb-1">
-                  Pro · Monthly
-                </p>
-                <p className="text-3xl font-bold text-on-surface mb-3">
-                  ₱199<span className="text-base text-on-surface-variant">/mo</span>
-                </p>
-                <ul className="text-sm text-on-surface space-y-2">
-                  {PRO_FEATURES.map((f) => (
-                    <li key={f} className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-tertiary shrink-0 mt-0.5" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={closeUpgrade}
-                className="flex-1 py-3 border border-outline-variant text-on-surface font-bold uppercase tracking-widest text-xs hover:bg-surface-variant transition-all"
-              >
-                Maybe Later
-              </button>
-              <button
-                onClick={closeUpgrade}
-                className="flex-1 py-3 bg-primary text-on-primary font-bold uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                Upgrade Now
-              </button>
-            </div>
-            <p className="text-[10px] text-on-surface-variant text-center mt-4 opacity-70">
-              Payments are coming soon. This is a preview of the upgrade experience.
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="border border-outline-variant rounded p-5">
+            <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant mb-1">
+              Free
             </p>
+            <p className="text-3xl font-bold text-on-surface mb-3">₱0</p>
+            <ul className="text-sm text-on-surface-variant space-y-2">
+              <li>3 mock exams / month</li>
+              <li>Basic review</li>
+              <li>Standard timer</li>
+            </ul>
+          </div>
+          <div className="border-2 border-primary bg-primary-container/30 rounded p-5 relative">
+            <span className="absolute -top-2 right-4 bg-primary text-on-primary text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-sm">
+              Most Popular
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-widest text-primary mb-1">
+              Pro · Monthly
+            </p>
+            <p className="text-3xl font-bold text-on-surface mb-3">
+              ₱199<span className="text-base text-on-surface-variant">/mo</span>
+            </p>
+            <ul className="text-sm text-on-surface space-y-2">
+              {PRO_FEATURES.map((f) => (
+                <li key={f} className="flex items-start gap-2">
+                  <Check className="w-4 h-4 text-tertiary shrink-0 mt-0.5" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
-      )}
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={closeUpgrade}
+            className="flex-1 py-3 border border-outline-variant text-on-surface font-bold uppercase tracking-widest text-xs hover:bg-surface-variant transition-all"
+          >
+            Maybe Later
+          </button>
+          <button
+            onClick={closeUpgrade}
+            className="flex-1 py-3 bg-primary text-on-primary font-bold uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            Upgrade Now
+          </button>
+        </div>
+        <p className="text-[10px] text-on-surface-variant text-center mt-4 opacity-70">
+          Payments are coming soon. This is a preview of the upgrade experience.
+        </p>
+      </Modal>
 
       <div className="flex-1 flex flex-col md:pl-64 z-10 w-full relative">
         <header className="bg-surface/90 backdrop-blur-md border-b border-outline-variant sticky top-0 z-30">

@@ -12,27 +12,13 @@ import {
   Grid,
   ArrowRight,
   Lock,
-  X,
   AlertTriangle,
 } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
-import { useFocusTrap } from '../hooks/useFocusTrap';
+import { Modal } from '../components/Modal';
 import { PROFESSIONAL_SECTIONS } from '../data/questions';
 import { filterByTopic, topicProgress, type TopicFilter } from './examNavigator';
-
-function formatTime(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-function formatDurationCompact(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
+import { formatDuration, formatTime } from '../utils/format';
 
 function SubmittedRedirect({ onNavigate }: { onNavigate: (screen: 'review') => void }) {
   useEffect(() => {
@@ -127,8 +113,6 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showNavigator, setShowNavigator] = useState(false);
   const [topicFilter, setTopicFilter] = useState<TopicFilter>('all');
-  const confirmRef = useFocusTrap<HTMLDivElement>(showConfirm);
-  const navigatorRef = useFocusTrap<HTMLDivElement>(showNavigator);
 
   const isLowTime = state.timeLeft < 300;
   const total = state.questions.length;
@@ -190,7 +174,7 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
         <div className="bg-surface-container border border-outline-variant p-10 max-w-md w-full text-center rounded shadow-sm">
           <h2 className="text-2xl font-bold mb-3 tracking-tight">Ready to begin?</h2>
           <p className="text-on-surface-variant mb-8">
-            {total} questions · {formatDurationCompact(state.timeLeft)} duration
+            {total} questions · {formatDuration(state.timeLeft)} duration
           </p>
           <div className="flex flex-col gap-3">
             <button
@@ -496,134 +480,94 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
         </div>
       </footer>
 
-      {showConfirm && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          role="presentation"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setShowConfirm(false);
-          }}
-        >
-          <div
-            ref={confirmRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="submit-confirm-title"
-            aria-describedby="submit-confirm-desc"
-            className="bg-surface-container border border-outline-variant max-w-md w-full rounded shadow-2xl p-8 relative focus:outline-none"
-          >
-            <button
-              onClick={() => setShowConfirm(false)}
-              aria-label="Close submit confirmation"
-              className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="w-6 h-6 text-error" />
-              <h3 id="submit-confirm-title" className="text-xl font-bold tracking-tight">
-                Submit exam?
-              </h3>
-            </div>
-            <p id="submit-confirm-desc" className="text-on-surface-variant mb-6 text-sm leading-relaxed">
-              You answered <strong className="text-on-surface">{answeredCount}</strong> of {total} items.
-              {flaggedCount > 0 && (
-                <>
-                  {' '}
-                  <strong className="text-terracotta">{flaggedCount}</strong> {flaggedCount === 1 ? 'is' : 'are'} flagged for review.
-                </>
-              )}{' '}
-              This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="flex-1 py-3 border border-outline-variant text-on-surface font-bold uppercase tracking-widest text-xs hover:bg-surface-variant transition-all"
-              >
-                Continue
-              </button>
-              <button
-                onClick={submit}
-                className="flex-1 py-3 bg-error text-on-error font-bold uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all"
-              >
-                Submit
-              </button>
-            </div>
-          </div>
+      <Modal
+        open={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        labelledBy="submit-confirm-title"
+        describedBy="submit-confirm-desc"
+        panelClassName="max-w-md"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <AlertTriangle className="w-6 h-6 text-error" />
+          <h3 id="submit-confirm-title" className="text-xl font-bold tracking-tight">
+            Submit exam?
+          </h3>
         </div>
-      )}
+        <p id="submit-confirm-desc" className="text-on-surface-variant mb-6 text-sm leading-relaxed">
+          You answered <strong className="text-on-surface">{answeredCount}</strong> of {total} items.
+          {flaggedCount > 0 && (
+            <>
+              {' '}
+              <strong className="text-terracotta">{flaggedCount}</strong> {flaggedCount === 1 ? 'is' : 'are'} flagged for review.
+            </>
+          )}{' '}
+          This action cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowConfirm(false)}
+            className="flex-1 py-3 border border-outline-variant text-on-surface font-bold uppercase tracking-widest text-xs hover:bg-surface-variant transition-all"
+          >
+            Continue
+          </button>
+          <button
+            onClick={submit}
+            className="flex-1 py-3 bg-error text-on-error font-bold uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all"
+          >
+            Submit
+          </button>
+        </div>
+      </Modal>
 
-      {showNavigator && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center md:hidden"
-          role="presentation"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setShowNavigator(false);
-          }}
-        >
-          <div
-            ref={navigatorRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Question navigator"
-            className="bg-surface-container border-t md:border border-outline-variant w-full md:max-w-2xl md:rounded rounded-t-2xl p-6 max-h-[85vh] overflow-y-auto custom-scrollbar focus:outline-none"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold tracking-tight">Question Navigator</h3>
-              <button
-                onClick={() => setShowNavigator(false)}
-                aria-label="Close navigator"
-                className="text-on-surface-variant hover:text-on-surface"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            {renderTopicTabs(true)}
-            {visibleQuestions.length === 0 ? (
-              <p className="text-center text-sm text-on-surface-variant py-12">
-                No questions in this section.
-              </p>
-            ) : (
-              <div className="grid grid-cols-5 gap-2">
-                {visibleQuestions.map((q) => {
-                  const idx = state.questions.indexOf(q);
-                  const status = getStatus(q);
-                  const isCurrent = idx === state.currentIndex;
-                  return (
-                    <button
-                      key={q.id}
-                      onClick={() => {
-                        goTo(idx);
-                        setShowNavigator(false);
-                      }}
-                      aria-current={isCurrent ? 'true' : undefined}
-                      aria-label={`Item ${idx + 1}, ${status}`}
-                      className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
-                        ${
-                          isCurrent
-                            ? 'border-primary ring-1 ring-primary bg-secondary-container text-on-surface'
-                            : status === 'answered'
-                            ? 'bg-secondary-container text-on-secondary-container border-transparent'
-                            : status === 'flagged'
-                            ? 'bg-terracotta/10 text-terracotta border-terracotta/30'
-                            : 'bg-surface-container-highest text-on-surface-variant border-transparent'
-                        }
-                      `}
-                    >
-                      {String(idx + 1).padStart(2, '0')}
-                      {status === 'flagged' && (
-                        <Bookmark className="absolute -top-1 -right-1 w-3 h-3 text-terracotta fill-terracotta" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+      <Modal
+        open={showNavigator}
+        onClose={() => setShowNavigator(false)}
+        title="Question Navigator"
+        mobileSheet
+        panelClassName="max-w-2xl"
+      >
+        {renderTopicTabs(true)}
+        {visibleQuestions.length === 0 ? (
+          <p className="text-center text-sm text-on-surface-variant py-12">
+            No questions in this section.
+          </p>
+        ) : (
+          <div className="grid grid-cols-5 gap-2">
+            {visibleQuestions.map((q) => {
+              const idx = state.questions.indexOf(q);
+              const status = getStatus(q);
+              const isCurrent = idx === state.currentIndex;
+              return (
+                <button
+                  key={q.id}
+                  onClick={() => {
+                    goTo(idx);
+                    setShowNavigator(false);
+                  }}
+                  aria-current={isCurrent ? 'true' : undefined}
+                  aria-label={`Item ${idx + 1}, ${status}`}
+                  className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
+                    ${
+                      isCurrent
+                        ? 'border-primary ring-1 ring-primary bg-secondary-container text-on-surface'
+                        : status === 'answered'
+                        ? 'bg-secondary-container text-on-secondary-container border-transparent'
+                        : status === 'flagged'
+                        ? 'bg-terracotta/10 text-terracotta border-terracotta/30'
+                        : 'bg-surface-container-highest text-on-surface-variant border-transparent'
+                    }
+                  `}
+                >
+                  {String(idx + 1).padStart(2, '0')}
+                  {status === 'flagged' && (
+                    <Bookmark className="absolute -top-1 -right-1 w-3 h-3 text-terracotta fill-terracotta" />
+                  )}
+                </button>
+              );
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

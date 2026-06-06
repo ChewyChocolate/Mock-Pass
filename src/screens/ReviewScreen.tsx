@@ -4,18 +4,9 @@ import MainLayout from '../components/MainLayout';
 import { CheckCircle2, XCircle, BrainCircuit, ChevronDown, Filter, Scale } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
 import { PASSING_SCORE, PROFESSIONAL_SECTIONS, PROFESSIONAL_TOPIC_WEIGHTS } from '../data/questions';
+import { formatDurationLong } from '../utils/format';
 
 type FilterMode = 'all' | 'incorrect' | 'flagged' | 'correct';
-
-function formatDuration(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) {
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
 
 function topicAccent(topic: string) {
   if (topic === 'Verbal Ability') return 'border-primary/40 text-primary';
@@ -174,7 +165,7 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
             <div className="mt-10 space-y-4">
               <div className="flex justify-between items-center text-on-surface-variant border-b border-outline-variant/30 pb-3">
                 <span className="text-xs font-semibold tracking-wide">Time Spent</span>
-                <span className="text-sm font-mono text-on-surface">{formatDuration(timeSpent)}</span>
+                <span className="text-sm font-mono text-on-surface">{formatDurationLong(timeSpent)}</span>
               </div>
               <div className="flex justify-between items-center text-on-surface-variant border-b border-outline-variant/30 pb-3">
                 <span className="text-xs font-semibold tracking-wide">Correct</span>

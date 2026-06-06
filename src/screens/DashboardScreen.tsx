@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { BaseScreenProps, ExamLevel } from '../types';
 import MainLayout from '../components/MainLayout';
+import { KpiCard } from '../components/KpiCard';
 import RecentSessionList from '../components/RecentSessionList';
 import {
   TrendingUp,
@@ -26,13 +27,7 @@ import {
   PASSING_SCORE,
 } from '../data/questions';
 import { usePerformanceStats } from '../hooks/usePerformanceStats';
-
-function formatDuration(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
+import { formatDuration, formatHours } from '../utils/format';
 
 type LevelOption = {
   id: ExamLevel;
@@ -133,18 +128,12 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
         </section>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-12">
-          <div className="bg-surface-container-high p-6 border border-outline-variant rounded flex flex-col justify-between min-h-[160px]">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Average Score
-                </span>
-                <TrendingUp className="text-primary w-5 h-5" />
-              </div>
-              <div className="text-4xl font-bold text-on-surface mb-2 tracking-tighter">
-                {hasHistory ? `${stats.average}%` : '—'}
-              </div>
-            </div>
+          <KpiCard
+            label="Average Score"
+            value={`${stats.average}%`}
+            icon={<TrendingUp className="text-primary w-5 h-5" />}
+            empty={!hasHistory}
+          >
             <div className="h-10 flex items-end gap-1 opacity-80 mt-4">
               {hasHistory
                 ? history
@@ -171,79 +160,47 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
                     ></div>
                   ))}
             </div>
-          </div>
+          </KpiCard>
 
-          <div className="bg-surface-container-high p-6 border border-outline-variant rounded flex flex-col justify-between min-h-[160px]">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Best Score
-                </span>
-                <Trophy className="text-tertiary w-5 h-5" />
-              </div>
-              <div className="text-4xl font-bold text-on-surface mb-2 tracking-tighter">
-                {hasHistory ? `${stats.best}%` : '—'}
-              </div>
-            </div>
-            <div className="text-sm font-medium text-on-surface-variant mt-4">
-              {hasHistory
+          <KpiCard
+            label="Best Score"
+            value={`${stats.best}%`}
+            icon={<Trophy className="text-tertiary w-5 h-5" />}
+            accent="tertiary"
+            empty={!hasHistory}
+            hint={
+              hasHistory
                 ? `Across ${stats.totalExams} ${stats.totalExams === 1 ? 'session' : 'sessions'}`
-                : 'No exams yet'}
-            </div>
-          </div>
+                : 'No exams yet'
+            }
+          />
 
-          <div className="bg-surface-container-high p-6 border border-outline-variant rounded flex flex-col justify-between min-h-[160px]">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Pass Rate
-                </span>
-                <Target className="text-primary w-5 h-5" />
-              </div>
-              <div className="text-4xl font-bold text-on-surface mb-2 tracking-tighter">
-                {hasHistory ? `${stats.passRate}%` : '—'}
-              </div>
-            </div>
-            <div className="text-sm font-medium text-on-surface-variant mt-4">
-              {hasHistory
-                ? `Passing threshold: ${PASSING_SCORE}%`
-                : 'No data yet'}
-            </div>
-          </div>
+          <KpiCard
+            label="Pass Rate"
+            value={`${stats.passRate}%`}
+            icon={<Target className="text-primary w-5 h-5" />}
+            empty={!hasHistory}
+            hint={
+              hasHistory ? `Passing threshold: ${PASSING_SCORE}%` : 'No data yet'
+            }
+          />
 
-          <div className="bg-surface-container-high p-6 border border-outline-variant rounded flex flex-col justify-between min-h-[160px]">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Study Streak
-                </span>
-                <Flame className="text-terracotta w-5 h-5" />
-              </div>
-              <div className="text-4xl font-bold text-on-surface mb-2 tracking-tighter">
-                {hasHistory ? `${stats.streak}d` : '—'}
-              </div>
-            </div>
-            <div className="text-sm font-medium text-on-surface-variant mt-4">
-              {hasHistory ? 'Consecutive practice days' : 'Take your first exam'}
-            </div>
-          </div>
+          <KpiCard
+            label="Study Streak"
+            value={`${stats.streak}d`}
+            icon={<Flame className="text-terracotta w-5 h-5" />}
+            accent="terracotta"
+            empty={!hasHistory}
+            hint={hasHistory ? 'Consecutive practice days' : 'Take your first exam'}
+          />
 
-          <div className="bg-surface-container-high p-6 border border-outline-variant rounded flex flex-col justify-between min-h-[160px]">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Hours Studied
-                </span>
-                <Timer className="text-primary w-5 h-5" />
-              </div>
-              <div className="text-4xl font-bold text-on-surface mb-2 tracking-tighter">
-                {hasHistory ? `${stats.totalHours}h` : '0h'}
-              </div>
-            </div>
-            <div className="text-sm font-medium text-on-surface-variant mt-4">
-              {hasHistory ? 'Cumulative time on task' : 'Take your first exam'}
-            </div>
-          </div>
+          <KpiCard
+            label="Hours Studied"
+            value={formatHours(stats.totalSeconds)}
+            icon={<Timer className="text-primary w-5 h-5" />}
+            empty={!hasHistory}
+            hint={hasHistory ? 'Cumulative time on task' : 'Take your first exam'}
+          />
         </div>
 
         <div className="mb-12 bg-surface border border-outline-variant rounded p-6 md:p-8 relative overflow-hidden">

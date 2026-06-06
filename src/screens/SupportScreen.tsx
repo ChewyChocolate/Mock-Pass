@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { BaseScreenProps } from '../types';
 import MainLayout from '../components/MainLayout';
+import { SectionCard } from '../components/SectionCard';
+import { SectionHeader } from '../components/SectionHeader';
+import { Accordion } from '../components/Accordion';
 import {
-  ChevronDown,
   Mail,
   MessageSquare,
   Phone,
@@ -123,52 +125,34 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <section className="lg:col-span-7 bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
-            <div className="flex items-center gap-2 mb-6">
-              <HelpCircle className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-bold tracking-tight">Frequently Asked Questions</h2>
-            </div>
+          <SectionCard className="lg:col-span-7">
+            <SectionHeader
+              icon={<HelpCircle className="w-5 h-5 text-primary" />}
+              title="Frequently Asked Questions"
+            />
             <div className="divide-y divide-outline-variant/40">
               {FAQS.map((item, i) => {
                 const open = !!openFaq[i];
                 return (
-                  <div key={i}>
-                    <button
-                      onClick={() =>
-                        setOpenFaq((prev) => ({ ...prev, [i]: !prev[i] }))
-                      }
-                      aria-expanded={open}
-                      aria-controls={`faq-${i}`}
-                      className="w-full flex items-center justify-between py-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
-                    >
-                      <span className="font-semibold text-on-surface pr-4">{item.q}</span>
-                      <ChevronDown
-                        className={`w-5 h-5 text-on-surface-variant transition-transform duration-300 shrink-0 ${
-                          open ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </button>
-                    <div
-                      id={`faq-${i}`}
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        open ? 'max-h-96 opacity-100 pb-4' : 'max-h-0 opacity-0'
-                      }`}
-                    >
-                      <p className="text-on-surface-variant text-sm leading-relaxed">
-                        {item.a}
-                      </p>
-                    </div>
-                  </div>
+                  <Accordion
+                    key={i}
+                    id={`faq-${i}`}
+                    title={item.q}
+                    open={open}
+                    onToggle={() => setOpenFaq((prev) => ({ ...prev, [i]: !prev[i] }))}
+                  >
+                    <p className="text-on-surface-variant text-sm leading-relaxed">{item.a}</p>
+                  </Accordion>
                 );
               })}
             </div>
-          </section>
+          </SectionCard>
 
-          <section className="lg:col-span-5 bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
-            <div className="flex items-center gap-2 mb-6">
-              <Send className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-bold tracking-tight">Send us a message</h2>
-            </div>
+          <SectionCard className="lg:col-span-5">
+            <SectionHeader
+              icon={<Send className="w-5 h-5 text-primary" />}
+              title="Send us a message"
+            />
 
             {sent ? (
               <div
@@ -283,7 +267,7 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
                 </button>
               </form>
             )}
-          </section>
+          </SectionCard>
         </div>
       </div>
     </MainLayout>
