@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { ExamLevel, ExamSessionSummary } from '../types';
-import { PASSING_SCORE } from '../data/questions';
+import { didPass } from '../data/questions';
 
 export interface TopicMasteryRow {
   topic: string;
@@ -62,7 +62,7 @@ export function computePerformanceStats(history: ExamSessionSummary[]): Performa
   const totalExams = history.length;
   const average = Math.round(history.reduce((a, s) => a + s.score, 0) / totalExams);
   const best = Math.max(...history.map((s) => s.score));
-  const passed = history.filter((s) => s.score >= PASSING_SCORE).length;
+  const passed = history.filter((s) => didPass(s.score)).length;
   const passRate = Math.round((passed / totalExams) * 100);
   const totalSeconds = history.reduce((a, s) => a + s.timeSpentSeconds, 0);
   const totalHours = (totalSeconds / 3600).toFixed(1);

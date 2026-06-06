@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { BaseScreenProps, ExamLevel } from '../types';
+import { BaseScreenProps, ExamLevel, LEVEL_LABELS } from '../types';
 import MainLayout from '../components/MainLayout';
 import { KpiCard } from '../components/KpiCard';
 import RecentSessionList from '../components/RecentSessionList';
@@ -44,7 +44,7 @@ type LevelOption = {
 const LEVEL_OPTIONS: LevelOption[] = [
   {
     id: 'sub-professional',
-    label: 'Sub-Professional',
+    label: LEVEL_LABELS['sub-professional'],
     description: 'For first-level government positions. Clerical and basic office skills focus.',
     icon: <BookOpen className="w-5 h-5" />,
     questions: SUB_PROFESSIONAL_QUESTION_COUNT,
@@ -59,7 +59,7 @@ const LEVEL_OPTIONS: LevelOption[] = [
   },
   {
     id: 'professional',
-    label: 'Professional',
+    label: LEVEL_LABELS['professional'],
     description: `For second-level government positions. ${PROFESSIONAL_QUESTION_COUNT} items divided across 4 weighted sections.`,
     icon: <GraduationCap className="w-5 h-5" />,
     questions: PROFESSIONAL_QUESTION_COUNT,

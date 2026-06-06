@@ -115,3 +115,12 @@ export function migrateSessionScore(score: number): number {
   if (score > 100) return Math.round(score / 100);
   return Math.max(0, Math.min(100, score));
 }
+
+/**
+ * Canonical pass/fail predicate. Single source of truth for the
+ * "is this score a pass?" check across UI, stats, and color helpers,
+ * so the threshold can never drift between call sites.
+ */
+export function didPass(score: number): boolean {
+  return Number.isFinite(score) && score >= PASSING_SCORE;
+}

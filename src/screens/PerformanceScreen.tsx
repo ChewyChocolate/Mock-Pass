@@ -1,9 +1,10 @@
 import React from 'react';
-import { BaseScreenProps } from '../types';
+import { BaseScreenProps, LEVEL_LABELS } from '../types';
 import MainLayout from '../components/MainLayout';
 import { KpiCard } from '../components/KpiCard';
 import { SectionCard } from '../components/SectionCard';
 import { SectionHeader } from '../components/SectionHeader';
+import { EmptyState } from '../components/EmptyState';
 import {
   TrendingUp,
   Trophy,
@@ -14,7 +15,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
-import { PASSING_SCORE } from '../data/questions';
+import { PASSING_SCORE, didPass } from '../data/questions';
 import { usePerformanceStats } from '../hooks/usePerformanceStats';
 import { formatDate, formatHours } from '../utils/format';
 import { pctBarClass, pctBarTextClass } from '../utils/scoreColors';
@@ -225,19 +226,13 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
           />
 
           {!hasHistory ? (
-            <div className="py-16 text-center">
-              <BarChart3 className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
-              <p className="text-on-surface-variant mb-1">No sessions yet</p>
-              <p className="text-sm text-on-surface-variant opacity-70 mb-6">
-                Take a few mock exams to see your score trend.
-              </p>
-              <button
-                onClick={() => onNavigate('dashboard')}
-                className="bg-primary text-on-primary px-6 py-3 text-xs font-bold uppercase tracking-widest hover:brightness-110 transition-all rounded"
-              >
-                Start a Mock Exam
-              </button>
-            </div>
+            <EmptyState
+              size="lg"
+              icon={<BarChart3 className="w-full h-full" />}
+              title="No sessions yet"
+              description="Take a few mock exams to see your score trend."
+              action={{ label: 'Start a Mock Exam', onClick: () => onNavigate('dashboard') }}
+            />
           ) : (
             <ScoreTrendChart points={stats.trend} />
           )}
@@ -252,7 +247,7 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
             />
             <div className="space-y-5">
               {stats.topicMastery.map((row) => {
-                const good = row.pct >= 80;
+                const good = didPass(row.pct);
                 return (
                   <div key={row.topic}>
                     <div className="flex justify-between mb-2">
@@ -284,7 +279,7 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
               {stats.levelBreakdown.map((row) => (
                 <div key={row.level} className="p-5 border border-outline-variant rounded">
                   <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant mb-1">
-                    {row.level === 'sub-professional' ? 'Sub-Professional' : 'Professional'}
+                    {LEVEL_LABELS[row.level]}
                   </p>
                   <p className="text-3xl font-bold text-on-surface mb-1">{row.avg}%</p>
                   <p className="text-xs text-on-surface-variant">

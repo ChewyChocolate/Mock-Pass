@@ -1,4 +1,4 @@
-import { PASSING_SCORE } from '../data/questions';
+import { didPass } from '../data/questions';
 
 /**
  * 3-tier text color used in tables, lists, and KPIs (tertiary ≥80,
@@ -26,9 +26,9 @@ export function dotColorClass(pct: number): string {
  * middle tier. Returns a Tailwind class string.
  */
 export function pctBarClass(pct: number): string {
-  return pct >= PASSING_SCORE ? 'bg-primary' : 'bg-error';
+  return didPass(pct) ? 'bg-primary' : 'bg-error';
 }
 
 export function pctBarTextClass(pct: number): string {
-  return pct >= PASSING_SCORE ? 'text-primary' : 'text-error';
+  return didPass(pct) ? 'text-primary' : 'text-error';
 }

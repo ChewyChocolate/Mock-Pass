@@ -1,10 +1,16 @@
 import { useMemo, useState } from 'react';
-import { BaseScreenProps } from '../types';
+import { BaseScreenProps, LEVEL_LABELS } from '../types';
 import MainLayout from '../components/MainLayout';
 import { CheckCircle2, XCircle, BrainCircuit, ChevronDown, Filter, Scale } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
-import { PASSING_SCORE, PROFESSIONAL_SECTIONS, PROFESSIONAL_TOPIC_WEIGHTS } from '../data/questions';
+import {
+  PROFESSIONAL_SECTIONS,
+  PROFESSIONAL_TOPIC_WEIGHTS,
+  buildTopicStats,
+  didPass,
+} from '../data/questions';
 import { formatDurationLong } from '../utils/format';
+import { EmptyState } from '../components/EmptyState';
 
 type FilterMode = 'all' | 'incorrect' | 'flagged' | 'correct';
 
@@ -43,21 +49,15 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
     state.startedAt && state.submittedAt
       ? Math.floor((state.submittedAt - state.startedAt) / 1000)
       : 0;
-  const passed = score >= PASSING_SCORE;
+  const passed = didPass(score);
 
   const topicBreakdown = useMemo(() => {
-    const map = new Map<string, { correct: number; total: number }>();
-    for (const q of state.questions) {
-      const entry = map.get(q.topic) ?? { correct: 0, total: 0 };
-      entry.total += 1;
-      if (state.answers[q.id] === q.correctOptionId) entry.correct += 1;
-      map.set(q.topic, entry);
-    }
-    return Array.from(map.entries()).map(([topic, { correct, total: t }]) => ({
+    const stats = buildTopicStats(state.questions, state.answers);
+    return Object.entries(stats).map(([topic, { correct, total }]) => ({
       topic,
       correct,
-      total: t,
-      pct: t === 0 ? 0 : Math.round((correct / t) * 100),
+      total,
+      pct: total === 0 ? 0 : Math.round((correct / total) * 100),
       weight: PROFESSIONAL_TOPIC_WEIGHTS[topic as keyof typeof PROFESSIONAL_TOPIC_WEIGHTS] ?? 0,
     }));
   }, [state.questions, state.answers]);
@@ -100,7 +100,7 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
             </h2>
             <div className="mb-8">
               <span className="text-[10px] font-bold uppercase tracking-widest border border-primary/40 text-primary px-2 py-1 rounded-sm">
-                {state.level === 'sub-professional' ? 'Sub-Professional' : 'Professional'}
+                {LEVEL_LABELS[state.level]}
               </span>
             </div>
 
@@ -208,7 +208,7 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
             </div>
             <div className="space-y-6">
               {topicBreakdown.map((row) => {
-                const good = row.pct >= 80;
+                const good = didPass(row.pct);
                 const weightPct = Math.round(row.weight * 100);
                 return (
                   <div key={row.topic}>
@@ -299,9 +299,11 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
 
           <div className="space-y-6">
             {visibleQuestions.length === 0 && (
-              <div className="bg-surface-container-low border border-outline-variant rounded p-10 text-center">
-                <p className="text-on-surface-variant">No questions match this filter.</p>
-              </div>
+              <EmptyState
+                size="md"
+                title="No questions match this filter."
+                className="bg-surface-container-low border border-outline-variant rounded"
+              />
             )}
 
             {visibleQuestions.map((q) => {

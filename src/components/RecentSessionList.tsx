@@ -1,4 +1,4 @@
-import { ExamSessionSummary } from '../types';
+import { ExamSessionSummary, LEVEL_LABELS_SHORT } from '../types';
 import { dotColorClass, pctColorClass } from '../utils/scoreColors';
 import { formatDate } from '../utils/format';
 
@@ -108,7 +108,7 @@ export default function RecentSessionList({
                 </div>
               </td>
               <td className="px-6 py-5 text-sm text-on-surface-variant capitalize">
-                {s.level === 'sub-professional' ? 'Sub-Pro' : 'Professional'}
+                {LEVEL_LABELS_SHORT[s.level]}
               </td>
               <td className="px-6 py-5 text-sm text-on-surface-variant">Mock Exam</td>
               <td className={`px-6 py-5 text-sm font-bold ${pctColorClass(s.score)}`}>

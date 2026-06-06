@@ -6,12 +6,30 @@ export interface BaseScreenProps {
 
 export type ExamLevel = 'sub-professional' | 'professional';
 
+export const LEVEL_LABELS: Record<ExamLevel, string> = {
+  'sub-professional': 'Sub-Professional',
+  'professional': 'Professional',
+};
+
+export const LEVEL_LABELS_SHORT: Record<ExamLevel, string> = {
+  'sub-professional': 'Sub-Pro',
+  'professional': 'Professional',
+};
+
 export type QuestionTopic =
   | 'Verbal Ability'
   | 'Numerical Ability'
   | 'Analytical Reasoning'
   | 'General Information'
   | 'Clerical Ability';
+
+export const TOPIC_SHORT_LABELS: Record<QuestionTopic, string> = {
+  'Verbal Ability': 'Verbal',
+  'Numerical Ability': 'Numerical',
+  'Analytical Reasoning': 'Analytical',
+  'General Information': 'General',
+  'Clerical Ability': 'Clerical',
+};
 
 export interface QuestionOption {
   id: 'A' | 'B' | 'C' | 'D';

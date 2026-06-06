@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BaseScreenProps, QuestionTopic } from '../types';
+import { BaseScreenProps, QuestionTopic, TOPIC_SHORT_LABELS } from '../types';
 import {
   Timer,
   History,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
 import { Modal } from '../components/Modal';
+import { EmptyState } from '../components/EmptyState';
+import { QuestionGrid } from '../components/QuestionGrid';
 import { PROFESSIONAL_SECTIONS } from '../data/questions';
 import { filterByTopic, topicProgress, type TopicFilter } from './examNavigator';
 import { formatDuration, formatTime } from '../utils/format';
@@ -153,7 +155,7 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
             return (
               <TopicTab
                 key={section.topic}
-                label={section.topic === 'General Information' ? 'General' : section.topic.replace(' Ability', '').replace(' Reasoning', '')}
+                label={TOPIC_SHORT_LABELS[section.topic]}
                 answered={sectionProgress.answered}
                 total={sectionProgress.total}
                 active={topicFilter === section.topic}
@@ -289,41 +291,16 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-surface-container-low/50">
             {renderTopicTabs(false)}
             {visibleQuestions.length === 0 ? (
-              <p className="text-center text-xs text-on-surface-variant py-8">
-                No questions in this section.
-              </p>
+              <EmptyState size="sm" title="No questions in this section." />
             ) : (
-              <div className="grid grid-cols-5 gap-2">
-                {visibleQuestions.map((q) => {
-                  const idx = state.questions.indexOf(q);
-                  const status = getStatus(q);
-                  const isCurrent = idx === state.currentIndex;
-                  return (
-                    <button
-                      key={q.id}
-                      onClick={() => goTo(idx)}
-                      aria-current={isCurrent ? 'true' : undefined}
-                      aria-label={`Item ${idx + 1}, ${status}`}
-                      className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
-                        ${
-                          isCurrent
-                            ? 'border-primary ring-1 ring-primary ring-offset-1 ring-offset-surface-container-low bg-secondary-container text-on-surface'
-                            : status === 'answered'
-                            ? 'bg-secondary-container text-on-secondary-container border-transparent hover:border-primary/50 transition-all'
-                            : status === 'flagged'
-                            ? 'bg-terracotta/10 text-terracotta border-terracotta/30'
-                            : 'bg-surface-container-highest text-on-surface-variant border-transparent hover:border-primary/30 transition-all'
-                        }
-                      `}
-                    >
-                      {String(idx + 1).padStart(2, '0')}
-                      {status === 'flagged' && (
-                        <Bookmark className="absolute -top-1 -right-1 w-3 h-3 text-terracotta fill-terracotta" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              <QuestionGrid
+                questions={visibleQuestions}
+                allQuestions={state.questions}
+                currentIndex={state.currentIndex}
+                getStatus={getStatus}
+                onSelect={goTo}
+                style="sidebar"
+              />
             )}
           </div>
         </aside>
@@ -528,44 +505,19 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
       >
         {renderTopicTabs(true)}
         {visibleQuestions.length === 0 ? (
-          <p className="text-center text-sm text-on-surface-variant py-12">
-            No questions in this section.
-          </p>
+          <EmptyState size="md" title="No questions in this section." />
         ) : (
-          <div className="grid grid-cols-5 gap-2">
-            {visibleQuestions.map((q) => {
-              const idx = state.questions.indexOf(q);
-              const status = getStatus(q);
-              const isCurrent = idx === state.currentIndex;
-              return (
-                <button
-                  key={q.id}
-                  onClick={() => {
-                    goTo(idx);
-                    setShowNavigator(false);
-                  }}
-                  aria-current={isCurrent ? 'true' : undefined}
-                  aria-label={`Item ${idx + 1}, ${status}`}
-                  className={`aspect-square flex items-center justify-center text-xs font-mono font-bold border rounded-sm relative
-                    ${
-                      isCurrent
-                        ? 'border-primary ring-1 ring-primary bg-secondary-container text-on-surface'
-                        : status === 'answered'
-                        ? 'bg-secondary-container text-on-secondary-container border-transparent'
-                        : status === 'flagged'
-                        ? 'bg-terracotta/10 text-terracotta border-terracotta/30'
-                        : 'bg-surface-container-highest text-on-surface-variant border-transparent'
-                    }
-                  `}
-                >
-                  {String(idx + 1).padStart(2, '0')}
-                  {status === 'flagged' && (
-                    <Bookmark className="absolute -top-1 -right-1 w-3 h-3 text-terracotta fill-terracotta" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <QuestionGrid
+            questions={visibleQuestions}
+            allQuestions={state.questions}
+            currentIndex={state.currentIndex}
+            getStatus={getStatus}
+            onSelect={(idx) => {
+              goTo(idx);
+              setShowNavigator(false);
+            }}
+            style="modal"
+          />
         )}
       </Modal>
     </div>
