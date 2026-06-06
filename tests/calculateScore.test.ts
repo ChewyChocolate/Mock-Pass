@@ -4,6 +4,7 @@ import {
   PROFESSIONAL_TOPIC_WEIGHTS,
   calculateScore,
   getQuestionsForLevel,
+  migrateSessionScore,
   PROFESSIONAL_QUESTION_COUNT,
 } from '../src/data/questions';
 import type { TopicStat } from '../src/types';
@@ -177,5 +178,43 @@ describe('getQuestionsForLevel', () => {
 
   it('returns the empty sub-professional pool', () => {
     expect(getQuestionsForLevel('sub-professional')).toHaveLength(0);
+  });
+});
+
+describe('migrateSessionScore (legacy ×100 bug migration)', () => {
+  it('passes through valid in-range scores unchanged', () => {
+    expect(migrateSessionScore(0)).toBe(0);
+    expect(migrateSessionScore(50)).toBe(50);
+    expect(migrateSessionScore(80)).toBe(80);
+    expect(migrateSessionScore(100)).toBe(100);
+  });
+
+  it('divides the reported 3881 bug value by 100 to recover 39', () => {
+    expect(migrateSessionScore(3881)).toBe(39);
+    expect(migrateSessionScore(10000)).toBe(100);
+    expect(migrateSessionScore(5000)).toBe(50);
+  });
+
+  it('rounds the divided score to the nearest integer', () => {
+    expect(migrateSessionScore(3885)).toBe(39);
+    expect(migrateSessionScore(3849)).toBe(38);
+    expect(migrateSessionScore(3850)).toBe(39);
+  });
+
+  it('collapses negative scores to 0', () => {
+    expect(migrateSessionScore(-5)).toBe(0);
+    expect(migrateSessionScore(-1000)).toBe(0);
+  });
+
+  it('coerces non-finite scores to 0', () => {
+    expect(migrateSessionScore(NaN)).toBe(0);
+    expect(migrateSessionScore(Infinity)).toBe(0);
+    expect(migrateSessionScore(-Infinity)).toBe(0);
+  });
+
+  it('end-to-end: average of three legacy 3881 sessions becomes 39, not 100', () => {
+    const sessions = [3881, 3881, 3881].map(migrateSessionScore);
+    const avg = Math.round(sessions.reduce((a, s) => a + s, 0) / sessions.length);
+    expect(avg).toBe(39);
   });
 });

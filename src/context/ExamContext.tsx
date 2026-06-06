@@ -17,9 +17,11 @@ import type {
 } from '../types';
 import {
   calculateScore,
+  migrateSessionScore,
   durationForLevel,
   getQuestionsForLevel,
 } from '../data/questions';
+import { generateSeed, seededShuffle } from '../utils/random';
 
 const STORAGE_KEY = 'mockpass:exam:v2';
 const LEGACY_KEY = 'mockpass:exam:v1';
@@ -27,6 +29,7 @@ const LEGACY_KEY = 'mockpass:exam:v1';
 interface ExamState {
   level: ExamLevel;
   questions: Question[];
+  sessionSeed: number | null;
   currentIndex: number;
   answers: Record<string, QuestionOption['id']>;
   flags: Record<string, boolean>;
@@ -57,6 +60,7 @@ const DEFAULT_LEVEL: ExamLevel = 'professional';
 const initialState: ExamState = {
   level: DEFAULT_LEVEL,
   questions: getQuestionsForLevel(DEFAULT_LEVEL),
+  sessionSeed: null,
   currentIndex: 0,
   answers: {},
   flags: {},
@@ -76,6 +80,7 @@ function reducer(state: ExamState, action: Action): ExamState {
         ...state,
         level: action.level,
         questions: getQuestionsForLevel(action.level),
+        sessionSeed: null,
         currentIndex: 0,
         answers: {},
         flags: {},
@@ -83,6 +88,7 @@ function reducer(state: ExamState, action: Action): ExamState {
       };
     case 'START_EXAM': {
       const now = Date.now();
+      const sessionSeed = generateSeed();
       return {
         ...state,
         status: 'in-progress',
@@ -91,6 +97,8 @@ function reducer(state: ExamState, action: Action): ExamState {
         currentIndex: 0,
         answers: {},
         flags: {},
+        sessionSeed,
+        questions: seededShuffle(getQuestionsForLevel(state.level), sessionSeed),
       };
     }
     case 'SELECT_ANSWER':
@@ -215,6 +223,9 @@ function loadPersisted(): Partial<ExamState> | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ExamState> & { questions?: Question[] };
+    if (Array.isArray(parsed.history)) {
+      parsed.history = parsed.history.map((s) => ({ ...s, score: migrateSessionScore(s.score) }));
+    }
     if (parsed.status === 'in-progress' && parsed.endsAt) {
       const remaining = Math.max(0, Math.ceil((parsed.endsAt - Date.now()) / 1000));
       return { ...parsed, timeLeft: remaining };
@@ -230,6 +241,7 @@ function savePersisted(state: ExamState) {
     const toSave: Partial<ExamState> = {
       level: state.level,
       questions: state.questions,
+      sessionSeed: state.sessionSeed,
       currentIndex: state.currentIndex,
       answers: state.answers,
       flags: state.flags,
@@ -268,6 +280,7 @@ export function ExamProvider({ children }: { children: ReactNode }) {
       merged.level = 'professional';
       merged.questions = getQuestionsForLevel('professional');
       merged.timeLeft = durationForLevel('professional');
+      merged.sessionSeed = null;
     }
     if (persisted.status === 'in-progress' && (persisted.endsAt ?? 0) <= Date.now()) {
       merged.status = 'idle';

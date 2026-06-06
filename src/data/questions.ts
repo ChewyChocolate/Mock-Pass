@@ -73,3 +73,16 @@ export function calculateScore(
   }
   return Math.round(weightedSum);
 }
+
+/**
+ * Defensive migration for persisted session scores. Two cases are handled:
+ *   1. Legacy scores from the pre-fix ×100 bug (e.g. 3881) are corrected by
+ *      dividing by 100, so a real 38.81% reads back as 39.
+ *   2. Any non-finite or negative value collapses to 0.
+ * Scores already in [0, 100] are returned unchanged.
+ */
+export function migrateSessionScore(score: number): number {
+  if (!Number.isFinite(score)) return 0;
+  if (score > 100) return Math.round(score / 100);
+  return Math.max(0, Math.min(100, score));
+}
