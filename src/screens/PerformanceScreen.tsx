@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { BaseScreenProps, ExamLevel } from '../types';
+import React from 'react';
+import { BaseScreenProps } from '../types';
 import MainLayout from '../components/MainLayout';
 import {
   TrendingUp,
@@ -12,18 +12,13 @@ import {
 } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
 import { PASSING_SCORE } from '../data/questions';
+import { usePerformanceStats } from '../hooks/usePerformanceStats';
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   });
-}
-
-function pctColorClass(pct: number) {
-  if (pct >= 80) return 'text-tertiary';
-  if (pct >= 60) return 'text-primary';
-  return 'text-error';
 }
 
 interface KpiProps {
@@ -176,93 +171,8 @@ function ScoreTrendChart({ points }: { points: { ts: number; score: number }[] }
 export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
   const { state, reset } = useExam();
   const history = state.history;
-  const hasHistory = history.length > 0;
-
-  const stats = useMemo(() => {
-    if (history.length === 0) {
-      return {
-        average: 0,
-        best: 0,
-        passRate: 0,
-        totalSeconds: 0,
-        totalExams: 0,
-        streak: 0,
-      };
-    }
-    const totalExams = history.length;
-    const average = Math.round(history.reduce((a, s) => a + s.score, 0) / totalExams);
-    const best = Math.max(...history.map((s) => s.score));
-    const passed = history.filter((s) => s.score >= PASSING_SCORE).length;
-    const passRate = Math.round((passed / totalExams) * 100);
-    const totalSeconds = history.reduce((a, s) => a + s.timeSpentSeconds, 0);
-
-    const days = new Set(history.map((s) => new Date(s.submittedAt).toDateString()));
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      if (days.has(d.toDateString())) {
-        streak += 1;
-      } else if (i > 0) {
-        break;
-      }
-    }
-
-    return { average, best, passRate, totalSeconds, totalExams, streak };
-  }, [history]);
-
-  const trend = useMemo(
-    () => history.slice(0, 12).map((s) => ({ ts: s.submittedAt, score: s.score })),
-    [history],
-  );
-
-  const topicMastery = useMemo(() => {
-    const map = new Map<string, { correct: number; total: number }>();
-    for (const s of history) {
-      const stats = s.topicStats as Record<string, { correct: number; total: number }>;
-      for (const [topic, stat] of Object.entries(stats)) {
-        const entry = map.get(topic) ?? { correct: 0, total: 0 };
-        entry.correct += stat.correct;
-        entry.total += stat.total;
-        map.set(topic, entry);
-      }
-    }
-    return Array.from(map.entries())
-      .map(([topic, { correct, total }]) => ({
-        topic,
-        correct,
-        total,
-        pct: total === 0 ? 0 : Math.round((correct / total) * 100),
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [history]);
-
-  const levelBreakdown = useMemo(() => {
-    const byLevel: Record<ExamLevel, { exams: number; scoreSum: number }> = {
-      professional: { exams: 0, scoreSum: 0 },
-      'sub-professional': { exams: 0, scoreSum: 0 },
-    };
-    for (const s of history) {
-      const entry = byLevel[s.level];
-      entry.exams += 1;
-      entry.scoreSum += s.score;
-    }
-    return (Object.entries(byLevel) as [ExamLevel, { exams: number; scoreSum: number }][])
-      .map(([level, { exams, scoreSum }]) => ({
-        level,
-        exams,
-        avg: exams === 0 ? 0 : Math.round(scoreSum / exams),
-      }))
-      .filter((row) => row.exams > 0);
-  }, [history]);
-
-  const totalHours = (stats.totalSeconds / 3600).toFixed(1);
-  const recentAvg =
-    history.length >= 3
-      ? Math.round(history.slice(0, 3).reduce((a, s) => a + s.score, 0) / 3)
-      : stats.average;
-  const trendDelta = recentAvg - stats.average;
+  const stats = usePerformanceStats(history);
+  const hasHistory = stats.hasHistory;
 
   return (
     <MainLayout onNavigate={onNavigate} currentScreen="performance">
@@ -296,7 +206,7 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
             icon={<TrendingUp className="w-5 h-5" />}
             hint={
               hasHistory
-                ? `Last 3 exams: ${recentAvg}% (${trendDelta >= 0 ? '+' : ''}${trendDelta})`
+                ? `Last 3 exams: ${stats.recentAvg}% (${stats.trendDelta >= 0 ? '+' : ''}${stats.trendDelta})`
                 : 'No data yet'
             }
             accent="primary"
@@ -319,7 +229,7 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
             label="Study Streak"
             value={hasHistory ? `${stats.streak} day${stats.streak === 1 ? '' : 's'}` : '—'}
             icon={<Flame className="w-5 h-5" />}
-            hint={hasHistory ? `${totalHours}h total study time` : 'No data yet'}
+            hint={hasHistory ? `${stats.totalHours}h total study time` : 'No data yet'}
             accent="terracotta"
           />
         </div>
@@ -340,7 +250,7 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
                 <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant">
                   Hours Studied
                 </p>
-                <p className="font-mono text-xl font-bold text-on-surface">{totalHours}h</p>
+                <p className="font-mono text-xl font-bold text-on-surface">{stats.totalHours}h</p>
               </div>
             )}
           </div>
@@ -360,57 +270,11 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
               </button>
             </div>
           ) : (
-            <ScoreTrendChart points={trend} />
+            <ScoreTrendChart points={stats.trend} />
           )}
         </section>
 
-        <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                <Award className="w-5 h-5 text-primary" />
-                Recent Performance
-              </h2>
-              <p className="text-xs text-on-surface-variant mt-1 uppercase tracking-widest">
-                Your last 5 attempts
-              </p>
-            </div>
-          </div>
-          {hasHistory ? (
-            <ul className="divide-y divide-outline-variant/30">
-              {history.slice(0, 5).map((s, i) => (
-                <li
-                  key={s.id}
-                  className="py-4 flex items-center gap-4 hover:bg-surface-variant/30 transition-colors px-2 -mx-2 rounded cursor-pointer"
-                  onClick={() => onNavigate('review')}
-                >
-                  <div className="text-xs font-mono font-bold text-on-surface-variant w-8">
-                    #{i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">Mock Exam · {s.totalQuestions} items</p>
-                    <p className="text-xs text-on-surface-variant">{formatDate(s.submittedAt)}</p>
-                  </div>
-                  <div className="hidden sm:flex flex-col items-end">
-                    <span className="text-xs text-on-surface-variant">Correct</span>
-                    <span className="text-sm font-mono font-bold text-on-surface">
-                      {s.correct}/{s.totalQuestions}
-                    </span>
-                  </div>
-                  <div
-                    className={`text-2xl font-bold font-mono ${pctColorClass(s.score)}`}
-                  >
-                    {s.score}%
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-on-surface-variant text-sm">No exam history available.</p>
-          )}
-        </section>
-
-        {hasHistory && topicMastery.length > 0 && (
+        {hasHistory && stats.topicMastery.length > 0 && (
           <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
             <div className="flex items-center gap-2 mb-6">
               <Award className="w-5 h-5 text-primary" />
@@ -420,7 +284,7 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
               Aggregated across all sessions
             </p>
             <div className="space-y-5">
-              {topicMastery.map((row) => {
+              {stats.topicMastery.map((row) => {
                 const good = row.pct >= 80;
                 return (
                   <div key={row.topic}>
@@ -443,14 +307,14 @@ export default function PerformanceScreen({ onNavigate }: BaseScreenProps) {
           </section>
         )}
 
-        {hasHistory && levelBreakdown.length > 1 && (
+        {hasHistory && stats.levelBreakdown.length > 1 && (
           <section className="bg-surface-container-low border border-outline-variant rounded p-6 md:p-8">
             <div className="flex items-center gap-2 mb-6">
               <BarChart3 className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-bold tracking-tight">Performance by Level</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {levelBreakdown.map((row) => (
+              {stats.levelBreakdown.map((row) => (
                 <div key={row.level} className="p-5 border border-outline-variant rounded">
                   <p className="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant mb-1">
                     {row.level === 'sub-professional' ? 'Sub-Professional' : 'Professional'}

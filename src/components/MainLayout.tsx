@@ -31,7 +31,7 @@ const PRO_FEATURES = [
 
 export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: Screen }) {
   const { theme, toggleTheme } = useTheme();
-  const { signOut } = useExam();
+  const { signOut, state } = useExam();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -43,8 +43,15 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
     setMenuOpen(false);
   };
 
+  const resolveNavTarget = (id: Screen): Screen => {
+    if (id !== 'exam') return id;
+    if (state.status === 'submitted') return 'review';
+    if (state.status === 'idle') return 'dashboard';
+    return 'exam';
+  };
+
   const navigateAndClose = (id: Screen) => {
-    onNavigate(id);
+    onNavigate(resolveNavTarget(id));
     setDrawerOpen(false);
   };
 
@@ -238,7 +245,7 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                   return (
                     <button
                       key={item.id}
-                      onClick={() => onNavigate(item.id)}
+                      onClick={() => onNavigate(resolveNavTarget(item.id))}
                       aria-current={active ? 'page' : undefined}
                       className={`text-sm font-semibold transition-colors duration-200 ${
                         active

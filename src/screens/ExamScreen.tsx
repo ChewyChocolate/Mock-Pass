@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BaseScreenProps, QuestionTopic } from '../types';
 import {
   Timer,
@@ -32,6 +32,21 @@ function formatDurationCompact(seconds: number): string {
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
+
+function SubmittedRedirect({ onNavigate }: { onNavigate: (screen: 'review') => void }) {
+  useEffect(() => {
+    onNavigate('review');
+  }, [onNavigate]);
+  return (
+    <div className="bg-surface text-on-surface font-sans min-h-screen flex items-center justify-center p-6">
+      <div className="text-center">
+        <CheckCircle2 className="w-16 h-16 text-tertiary mx-auto mb-6" />
+        <h2 className="text-2xl font-bold mb-2">Exam submitted</h2>
+        <p className="text-on-surface-variant">Loading review…</p>
+      </div>
+    </div>
+  );
 }
 
 function topicAccentClasses(topic: QuestionTopic): {
@@ -200,15 +215,7 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
   }
 
   if (state.status === 'submitted') {
-    return (
-      <div className="bg-surface text-on-surface font-sans min-h-screen flex items-center justify-center p-6">
-        <div className="text-center">
-          <CheckCircle2 className="w-16 h-16 text-tertiary mx-auto mb-6" />
-          <h2 className="text-2xl font-bold mb-2">Exam submitted</h2>
-          <p className="text-on-surface-variant mb-6">Loading review…</p>
-        </div>
-      </div>
-    );
+    return <SubmittedRedirect onNavigate={onNavigate} />;
   }
 
   return (
