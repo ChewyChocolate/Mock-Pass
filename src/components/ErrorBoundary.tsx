@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { Sentry } from '../lib/sentry';
 
 interface Props {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('Mock Pass crashed:', error, info);
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
   }
 
   handleReset(): void {

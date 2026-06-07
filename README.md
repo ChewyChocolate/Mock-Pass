@@ -63,8 +63,25 @@ history will be there.
 3. In *Project Settings → Environment Variables*, add:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-4. Deploy. The `vercel.json` in this repo declares the env-var keys Vercel
-   should prompt for, and points at the `dist/` output directory.
+4. Deploy. The `vercel.json` in this repo points at the `dist/` output
+   directory.
+
+## Error tracking (Sentry, optional)
+
+Mock Pass ships with a Sentry integration that no-ops unless
+`VITE_SENTRY_DSN` is set. To enable production error monitoring:
+
+1. Create a Sentry project at <https://sentry.io> (free tier is fine).
+2. Copy the project DSN from *Project Settings → Client Keys (DSN)*.
+3. Set `VITE_SENTRY_DSN` in Vercel *Environment Variables* (or in
+   `.env.local` for development).
+4. Redeploy. The app will start reporting errors and capturing session
+   replays for any unhandled exception caught by `ErrorBoundary`.
+
+**Recommended**: install the
+[Vercel Sentry integration](https://vercel.com/integrations/sentry) — it
+sets `VITE_SENTRY_DSN` automatically on every deploy and uploads source
+maps. No manual env-var management required.
 
 ## Scripts
 
