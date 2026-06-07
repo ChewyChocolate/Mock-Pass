@@ -122,7 +122,8 @@ export function autoFillPass() {
   saveAndReload(state, state.questions.length);
 }
 
-if (import.meta.env.DEV && typeof window !== 'undefined') {
+const enableDevTools = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEVTOOLS === 'true';
+if (enableDevTools && typeof window !== 'undefined') {
   (window as unknown as { mockpass: unknown }).mockpass = {
     autoFillCorrect,
     autoFillRandom,
