@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { ExamLevel, ExamSessionSummary } from '../types';
 import { didPass } from '../data/questions';
+import { LIMITS } from '../lib/limits';
 
 export interface TopicMasteryRow {
   topic: string;
@@ -70,7 +71,7 @@ export function computePerformanceStats(history: ExamSessionSummary[]): Performa
   const days = new Set(history.map((s) => new Date(s.submittedAt).toDateString()));
   let streak = 0;
   const today = new Date();
-  for (let i = 0; i < 365; i++) {
+  for (let i = 0; i < LIMITS.maxStreakDays; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
     if (days.has(d.toDateString())) {
@@ -81,8 +82,8 @@ export function computePerformanceStats(history: ExamSessionSummary[]): Performa
   }
 
   const recentAvg =
-    history.length >= 3
-      ? Math.round(history.slice(0, 3).reduce((a, s) => a + s.score, 0) / 3)
+    history.length >= LIMITS.recentWindow
+      ? Math.round(history.slice(0, LIMITS.recentWindow).reduce((a, s) => a + s.score, 0) / LIMITS.recentWindow)
       : average;
   const trendDelta = recentAvg - average;
 
@@ -121,7 +122,7 @@ export function computePerformanceStats(history: ExamSessionSummary[]): Performa
     }))
     .filter((row) => row.exams > 0);
 
-  const trend = history.slice(0, 12).map((s) => ({ ts: s.submittedAt, score: s.score }));
+  const trend = history.slice(0, LIMITS.trendWindow).map((s) => ({ ts: s.submittedAt, score: s.score }));
 
   return {
     hasHistory: true,

@@ -1,6 +1,7 @@
 import { ExamSessionSummary, LEVEL_LABELS_SHORT } from '../types';
 import { dotColorClass, pctColorClass } from '../utils/scoreColors';
 import { formatDate } from '../utils/format';
+import { LIMITS } from '../lib/limits';
 
 type Variant = 'table' | 'list';
 
@@ -22,7 +23,7 @@ export default function RecentSessionList({
   variant,
   onSelect,
   emptyMessage = 'No exam history yet.',
-  limit = 5,
+  limit = LIMITS.recentActivityRows,
 }: RecentSessionListProps) {
   const rows = sessions.slice(0, limit);
 

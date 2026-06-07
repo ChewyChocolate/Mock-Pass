@@ -5,6 +5,7 @@ import { HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Su
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from './Modal';
+import { LIMITS } from '../lib/limits';
 
 interface NavItem {
   id: Screen;
@@ -231,7 +232,7 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
 
             <div className="hidden md:flex gap-8 items-center">
               <nav aria-label="Quick links" className="flex gap-6">
-                {NAV_ITEMS.slice(0, 2).map((item) => {
+                {NAV_ITEMS.slice(0, LIMITS.topNavCount).map((item) => {
                   const active = currentScreen === item.id;
                   return (
                     <button

@@ -28,9 +28,8 @@ import { generateSeed, groupedShuffle } from '../utils/random';
 import { useAuth } from './AuthContext';
 import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
 import { fetchRemoteHistory, pushSession } from '../lib/sync';
-
-const STORAGE_KEY = 'mockpass:exam:v2';
-const LEGACY_KEY = 'mockpass:exam:v1';
+import { STORAGE_KEYS } from '../lib/storageKeys';
+import { LIMITS } from '../lib/limits';
 
 interface ExamState {
   level: ExamLevel;
@@ -168,7 +167,7 @@ function reducer(state: ExamState, action: Action): ExamState {
         submittedAt,
         timeLeft: 0,
         endsAt: null,
-        history: [summary, ...state.history].slice(0, 20),
+        history: [summary, ...state.history].slice(0, LIMITS.maxLocalHistory),
       };
     }
     case 'RESET':
@@ -223,7 +222,7 @@ const ExamContext = createContext<ExamContextValue | undefined>(undefined);
 
 function loadPersisted(): Partial<ExamState> | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.exam);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ExamState> & { questions?: Question[] };
     if (Array.isArray(parsed.history)) {
@@ -254,7 +253,7 @@ function savePersisted(state: ExamState) {
       endsAt: state.endsAt,
       history: state.history,
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    localStorage.setItem(STORAGE_KEYS.exam, JSON.stringify(toSave));
   } catch {
     // ignore
   }
@@ -262,9 +261,9 @@ function savePersisted(state: ExamState) {
 
 function migrateLegacy() {
   try {
-    const legacy = localStorage.getItem(LEGACY_KEY);
+    const legacy = localStorage.getItem(STORAGE_KEYS.examLegacy);
     if (!legacy) return;
-    localStorage.removeItem(LEGACY_KEY);
+    localStorage.removeItem(STORAGE_KEYS.examLegacy);
   } catch {
     // ignore
   }

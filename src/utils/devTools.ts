@@ -1,6 +1,6 @@
 import { calculateScore, getQuestionsForLevel, migrateSessionScore, PASSING_SCORE } from '../data/questions';
+import { STORAGE_KEYS } from '../lib/storageKeys';
 
-const STORAGE_KEY = 'mockpass:exam:v2';
 const OPTIONS = ['A', 'B', 'C', 'D'] as const;
 
 type OptionId = (typeof OPTIONS)[number];
@@ -20,7 +20,7 @@ interface PersistedState {
 
 function loadState(): PersistedState | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.exam);
     if (!raw) return null;
     return JSON.parse(raw) as PersistedState;
   } catch {
@@ -29,7 +29,7 @@ function loadState(): PersistedState | null {
 }
 
 function saveAndReload(state: PersistedState, count: number) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEYS.exam, JSON.stringify(state));
   console.log(`Filled ${count} answers. Reloading…`);
   location.reload();
 }
@@ -134,7 +134,7 @@ if (enableDevTools && typeof window !== 'undefined') {
     history: {
       local: () => {
         try {
-          const raw = localStorage.getItem(STORAGE_KEY);
+          const raw = localStorage.getItem(STORAGE_KEYS.exam);
           const parsed = raw ? JSON.parse(raw) : null;
           const h = parsed?.history;
           return Array.isArray(h) ? { count: h.length, sessions: h } : { count: 0, sessions: [] };

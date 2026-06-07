@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { STORAGE_KEYS } from './storageKeys';
 
 export const SUPABASE_URL_ENV = 'VITE_SUPABASE_URL';
 export const SUPABASE_ANON_KEY_ENV = 'VITE_SUPABASE_ANON_KEY';
@@ -64,7 +65,7 @@ export function getSupabaseClient(): SupabaseClient {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: 'mockpass:supabase-auth',
+      storageKey: STORAGE_KEYS.supabaseAuth,
     },
   });
   return cachedClient;

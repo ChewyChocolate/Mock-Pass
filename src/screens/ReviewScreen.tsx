@@ -11,15 +11,9 @@ import {
 } from '../data/questions';
 import { formatDurationLong } from '../utils/format';
 import { EmptyState } from '../components/EmptyState';
+import { topicAccentBorderText } from '../utils/topicAccent';
 
 type FilterMode = 'all' | 'incorrect' | 'flagged' | 'correct';
-
-function topicAccent(topic: string) {
-  if (topic === 'Verbal Ability') return 'border-primary/40 text-primary';
-  if (topic === 'Numerical Ability') return 'border-terracotta/40 text-terracotta';
-  if (topic === 'Analytical Reasoning') return 'border-tertiary/40 text-tertiary';
-  return 'border-secondary/40 text-secondary';
-}
 
 export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
   const { state, score, correctCount, reset } = useExam();
@@ -327,7 +321,7 @@ export default function ReviewScreen({ onNavigate }: BaseScreenProps) {
                           {q.id.toUpperCase()} — {q.topic}
                         </span>
                         <span
-                          className={`text-[10px] font-bold uppercase tracking-widest border px-2 py-0.5 rounded-sm ${topicAccent(q.topic)}`}
+                          className={`text-[10px] font-bold uppercase tracking-widest border px-2 py-0.5 rounded-sm ${topicAccentBorderText(q.topic)}`}
                         >
                           {q.topic}
                         </span>

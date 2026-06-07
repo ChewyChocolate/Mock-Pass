@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
+import { useAuth } from '../context/AuthContext';
 import {
   PRO_DURATION_SECONDS,
   SUB_PRO_DURATION_SECONDS,
@@ -28,6 +29,7 @@ import {
 } from '../data/questions';
 import { usePerformanceStats } from '../hooks/usePerformanceStats';
 import { formatDuration, formatHours } from '../utils/format';
+import { LIMITS } from '../lib/limits';
 
 type LevelOption = {
   id: ExamLevel;
@@ -75,15 +77,23 @@ const LEVEL_OPTIONS: LevelOption[] = [
 
 export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
   const { state, setLevel, start } = useExam();
+  const { user } = useAuth();
   const history = state.history;
   const stats = usePerformanceStats(history);
 
   const lastSevenDays = useMemo(() => {
-    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - LIMITS.weeklyGoalDays * 24 * 60 * 60 * 1000;
     const recent = history.filter((s) => s.submittedAt >= cutoff);
-    const progress = Math.min(100, Math.round((recent.length / 3) * 100));
+    const progress = Math.min(100, Math.round((recent.length / LIMITS.weeklyGoalSessions) * 100));
     return { progress, sessions: recent.length };
   }, [history]);
+
+  const displayName = useMemo(() => {
+    const meta = user?.user_metadata as { full_name?: string; name?: string } | undefined;
+    const fullName = (meta?.full_name ?? meta?.name ?? '').trim();
+    if (!fullName) return null;
+    return fullName.split(/\s+/)[0]?.slice(0, 30) || null;
+  }, [user]);
 
   const hasHistory = stats.hasHistory;
   const inProgress = state.status === 'in-progress';
@@ -107,7 +117,7 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
         <section className="relative bg-primary-container rounded-lg overflow-hidden mb-12 border border-outline-variant/30 flex flex-col justify-center min-h-[280px]">
           <div className="p-8 md:p-12 relative z-20 w-full">
             <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4 tracking-tight">
-              Welcome back, Alex!
+              {displayName ? `Welcome back, ${displayName}!` : 'Welcome back!'}
             </h2>
             <p className="text-lg text-on-primary-container max-w-lg mb-8 leading-relaxed">
               {hasHistory
@@ -117,7 +127,7 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
             <div className="w-full max-w-md">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-semibold text-primary uppercase tracking-widest">
-                  Weekly Goal · {lastSevenDays.sessions}/3 sessions
+                  Weekly Goal · {lastSevenDays.sessions}/{LIMITS.weeklyGoalSessions} sessions
                 </span>
                 <span className="text-xs font-bold text-primary">{lastSevenDays.progress}%</span>
               </div>

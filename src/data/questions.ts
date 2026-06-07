@@ -3,8 +3,8 @@ import PROFESSIONAL_QUESTIONS from './questions/professionalQuestions';
 import SUB_PROFESSIONAL_QUESTIONS from './questions/subProfessionalQuestions';
 
 export const PASSING_SCORE = 80;
-export const PRO_DURATION_SECONDS = 60 * 60 * 2 + 60 * 44 + 55;
-export const SUB_PRO_DURATION_SECONDS = 60 * 60 * 2 + 60 * 5;
+export const PRO_DURATION_SECONDS = 2 * 3600 + 44 * 60 + 55;     // 2h 44m 55s
+export const SUB_PRO_DURATION_SECONDS = 2 * 3600 + 5 * 60;        // 2h 5m
 
 export const PROFESSIONAL_QUESTION_COUNT = PROFESSIONAL_QUESTIONS.length;
 export const SUB_PROFESSIONAL_QUESTION_COUNT = SUB_PROFESSIONAL_QUESTIONS.length;

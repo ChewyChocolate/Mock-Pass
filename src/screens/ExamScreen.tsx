@@ -21,6 +21,8 @@ import { QuestionGrid } from '../components/QuestionGrid';
 import { PROFESSIONAL_SECTIONS } from '../data/questions';
 import { filterByTopic, topicProgress, type TopicFilter } from './examNavigator';
 import { formatDuration, formatTime } from '../utils/format';
+import { LIMITS } from '../lib/limits';
+import { topicAccentClasses } from '../utils/topicAccent';
 
 function SubmittedRedirect({ onNavigate }: { onNavigate: (screen: 'review') => void }) {
   useEffect(() => {
@@ -35,36 +37,6 @@ function SubmittedRedirect({ onNavigate }: { onNavigate: (screen: 'review') => v
       </div>
     </div>
   );
-}
-
-function topicAccentClasses(topic: QuestionTopic): {
-  active: string;
-  badge: string;
-  ring: string;
-} {
-  if (topic === 'Verbal Ability')
-    return {
-      active: 'bg-primary text-on-primary border-primary',
-      badge: 'bg-primary-container text-primary',
-      ring: 'ring-primary',
-    };
-  if (topic === 'Analytical Reasoning')
-    return {
-      active: 'bg-tertiary text-on-tertiary border-tertiary',
-      badge: 'bg-tertiary-container text-tertiary',
-      ring: 'ring-tertiary',
-    };
-  if (topic === 'Numerical Ability')
-    return {
-      active: 'bg-terracotta text-white border-terracotta',
-      badge: 'bg-terracotta/15 text-terracotta',
-      ring: 'ring-terracotta',
-    };
-  return {
-    active: 'bg-secondary text-on-secondary border-secondary',
-    badge: 'bg-secondary-container text-secondary',
-    ring: 'ring-secondary',
-  };
 }
 
 function TopicTab({
@@ -116,7 +88,7 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
   const [showNavigator, setShowNavigator] = useState(false);
   const [topicFilter, setTopicFilter] = useState<TopicFilter>('all');
 
-  const isLowTime = state.timeLeft < 300;
+  const isLowTime = state.timeLeft < LIMITS.lowTimeSeconds;
   const total = state.questions.length;
   const progressPct = Math.round((answeredCount / total) * 100);
   const currentStatus = getStatus(currentQuestion);
