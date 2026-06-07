@@ -1,12 +1,13 @@
 -- Mock Pass — Leaderboard schema
 -- Apply this after schema.sql in the Supabase SQL editor.
 -- Idempotent: safe to re-run.
+--
+-- v2: Active Exam Season model. The main leaderboard resets the day after
+-- each major Civil Service exam concludes, so reviewers compete against the
+-- current batch cramming for the same test date (not against users who
+-- already sat and passed a previous one).
 
 -- 1. Profiles table
--- Public projection of (handle + first_name + last_name) for use on the leaderboard.
--- We duplicate first_name/last_name here (they also live in auth.users.raw_user_meta_data)
--- because the auth schema is not readable by the anon/authenticated roles, but the
--- leaderboard needs to render a privacy-preserving subtitle for every user.
 create table if not exists public.profiles (
   user_id    uuid primary key references auth.users(id) on delete cascade,
   handle     text unique not null check (handle ~ '^[a-z0-9_]{3,20}$'),
@@ -22,7 +23,6 @@ drop policy if exists "users insert own profile" on public.profiles;
 drop policy if exists "users update own profile" on public.profiles;
 drop policy if exists "users delete own profile" on public.profiles;
 
--- Public read so the leaderboard can show handles + subtitles.
 create policy "handles are public"
   on public.profiles for select
   using (true);
@@ -44,16 +44,78 @@ create policy "users delete own profile"
   using (auth.uid() = user_id);
 
 -- 2. CHECK constraint on exam_sessions (soft anti-cheat)
--- Reject the easiest client-side fakes: a row claiming 200 correct out of 150 total,
--- or a row with total_questions = 0.
 alter table public.exam_sessions
   drop constraint if exists exam_sessions_correct_le_total;
 alter table public.exam_sessions
   add constraint exam_sessions_correct_le_total
   check (correct <= total_questions and total_questions > 0);
 
--- 3. View: best score per user per level (all-time)
-create or replace view public.leaderboard_best as
+-- 3. Exam seasons table
+-- Each row represents a CSE exam date and the window during which the
+-- leaderboard counts attempts toward that season. starts_at is when
+-- the season opens for review (typically ~60 days before exam_date).
+-- ends_at is midnight of the day AFTER exam_date (when the board resets).
+create table if not exists public.exam_seasons (
+  id          uuid primary key default gen_random_uuid(),
+  label       text not null,
+  exam_date   date not null,
+  starts_at   timestamptz not null,
+  ends_at     timestamptz not null,
+  created_at  timestamptz not null default now(),
+  constraint  exam_seasons_window_ordered check (ends_at > starts_at),
+  constraint  exam_seasons_window_days    check (
+    (extract(epoch from ends_at) - extract(epoch from starts_at)) between 86400 and 365 * 86400
+  )
+);
+
+create unique index if not exists exam_seasons_exam_date_key
+  on public.exam_seasons (exam_date);
+
+alter table public.exam_seasons enable row level security;
+
+drop policy if exists "seasons are public" on public.exam_seasons;
+
+create policy "seasons are public"
+  on public.exam_seasons for select
+  using (true);
+
+-- Seed: one active season. The "next" CSC exam is assumed to be Aug 15, 2026;
+-- the season window is 60 days before -> 1 day after. Update this row (or
+-- insert more rows) as new exam dates are announced.
+insert into public.exam_seasons (label, exam_date, starts_at, ends_at)
+values (
+  'August 2026 CSE',
+  date '2026-08-15',
+  timestamptz '2026-06-16 00:00:00+00',
+  timestamptz '2026-08-16 00:00:00+00'
+)
+on conflict (exam_date) do nothing;
+
+-- 4. View: the currently active season (the row whose [starts_at, ends_at]
+-- window contains now()). Used by both the UI header and the leaderboard
+-- views to filter sessions.
+create or replace view public.current_season as
+select id, label, exam_date, starts_at, ends_at
+from public.exam_seasons
+where now() between starts_at and ends_at
+order by starts_at desc
+limit 1;
+
+grant select on public.current_season to anon, authenticated;
+
+-- 5. Helper: build the subtitle string. Inlined in each view to keep the
+-- SQL portable and the views self-contained.
+--    substr(first_name, 1, 2) || '...' || substr(first_name, -1) || ' ' || substr(last_name, 1, 1)
+-- For users with no name metadata, the subtitle is NULL and the UI hides it.
+
+-- 6. Drop the v1 "all-time" views (replaced by season-scoped ones).
+drop view if exists public.leaderboard_best;
+drop view if exists public.leaderboard_week;
+drop view if exists public.leaderboard_topic;
+
+-- 7. View: best score per user per level WITHIN the active season.
+-- "Best" = highest single attempt submitted during the active season window.
+create or replace view public.leaderboard_season as
 select
   es.user_id,
   p.handle,
@@ -74,14 +136,16 @@ select
   max(es.submitted_at)        as best_submitted_at,
   count(*)::int               as attempts
 from public.exam_sessions es
-join public.profiles p on p.user_id = es.user_id
+join public.profiles      p  on p.user_id = es.user_id
+cross join public.current_season s
+where es.submitted_at >= (extract(epoch from s.starts_at) * 1000)::bigint
+  and es.submitted_at <  (extract(epoch from s.ends_at)   * 1000)::bigint
 group by es.user_id, p.handle, p.first_name, p.last_name, es.level;
 
-grant select on public.leaderboard_best to anon, authenticated;
+grant select on public.leaderboard_season to anon, authenticated;
 
--- 4. View: best score in the last 7 days (rolling weekly board)
--- exam_sessions.submitted_at is stored as a bigint (ms since epoch).
-create or replace view public.leaderboard_week as
+-- 8. View: best score in the active season AND in the last 7 days.
+create or replace view public.leaderboard_season_week as
 select
   es.user_id,
   p.handle,
@@ -102,15 +166,17 @@ select
   max(es.submitted_at)        as best_submitted_at,
   count(*)::int               as attempts_this_week
 from public.exam_sessions es
-join public.profiles p on p.user_id = es.user_id
+join public.profiles      p  on p.user_id = es.user_id
+cross join public.current_season s
 where es.submitted_at >= (extract(epoch from (now() - interval '7 days')) * 1000)::bigint
+  and es.submitted_at >= (extract(epoch from s.starts_at)            * 1000)::bigint
+  and es.submitted_at <  (extract(epoch from s.ends_at)              * 1000)::bigint
 group by es.user_id, p.handle, p.first_name, p.last_name, es.level;
 
-grant select on public.leaderboard_week to anon, authenticated;
+grant select on public.leaderboard_season_week to anon, authenticated;
 
--- 5. View: best per-topic accuracy, exploded from topic_stats jsonb
--- Each row in topic_stats is { "Topic Name": { "correct": n, "total": n } }.
-create or replace view public.leaderboard_topic as
+-- 9. View: best per-topic accuracy WITHIN the active season.
+create or replace view public.leaderboard_season_topic as
 with topic_data as (
   select
     es.user_id,
@@ -121,7 +187,10 @@ with topic_data as (
       as topic_pct
   from public.exam_sessions es
   cross join lateral jsonb_each(es.topic_stats) as topic(key, value)
+  cross join public.current_season s
   where (topic.value->>'total')::int > 0
+    and es.submitted_at >= (extract(epoch from s.starts_at) * 1000)::bigint
+    and es.submitted_at <  (extract(epoch from s.ends_at)   * 1000)::bigint
 )
 select
   td.user_id,
@@ -146,10 +215,9 @@ from topic_data td
 join public.profiles p on p.user_id = td.user_id
 group by td.user_id, p.handle, p.first_name, p.last_name, td.level, td.topic;
 
-grant select on public.leaderboard_topic to anon, authenticated;
+grant select on public.leaderboard_season_topic to anon, authenticated;
 
--- 6. RPC: handle availability check
--- Used by the Profile screen's debounced availability check.
+-- 10. RPC: handle availability check
 create or replace function public.is_handle_available(handle text)
 returns boolean
 language sql

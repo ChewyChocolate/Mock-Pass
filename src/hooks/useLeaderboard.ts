@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabaseClient } from '../lib/supabase';
 import {
-  fetchLeaderboardBest,
-  fetchLeaderboardTopic,
-  fetchLeaderboardWeek,
+  fetchCurrentSeason,
+  fetchLeaderboardSeason,
+  fetchLeaderboardSeasonTopic,
+  fetchLeaderboardSeasonWeek,
   findUserRank,
+  type FetchCurrentSeasonResult,
   type FetchLeaderboardResult,
   type FetchLeaderboardTopicResult,
 } from '../lib/leaderboard';
 import type {
   ExamLevel,
+  ExamSeason,
   LeaderboardEntry,
   LeaderboardTab,
   LeaderboardTopicEntry,
@@ -28,6 +31,8 @@ export interface UseLeaderboardResult {
   entries: LeaderboardEntry[] | LeaderboardTopicEntry[];
   userRank: number | null;
   error: string | null;
+  season: ExamSeason | null;
+  seasonError: string | null;
   refresh: () => void;
 }
 
@@ -35,11 +40,38 @@ export function useLeaderboard(view: LeaderboardView, currentUserId: string | nu
   const [status, setStatus] = useState<LeaderboardStatus>('idle');
   const [entries, setEntries] = useState<UseLeaderboardResult['entries']>([]);
   const [error, setError] = useState<string | null>(null);
+  const [season, setSeason] = useState<ExamSeason | null>(null);
+  const [seasonError, setSeasonError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
   const refresh = useCallback(() => {
     setRefreshTick((tick) => tick + 1);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const client = getSupabaseClient();
+        const r: FetchCurrentSeasonResult = await fetchCurrentSeason(client);
+        if (!active) return;
+        if (!r.ok) {
+          setSeason(null);
+          setSeasonError(r.error ?? 'Could not load current season.');
+        } else {
+          setSeason(r.season);
+          setSeasonError(null);
+        }
+      } catch (err) {
+        if (!active) return;
+        setSeason(null);
+        setSeasonError(err instanceof Error ? err.message : 'Could not load current season.');
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [refreshTick]);
 
   useEffect(() => {
     let active = true;
@@ -51,9 +83,9 @@ export function useLeaderboard(view: LeaderboardView, currentUserId: string | nu
       try {
         const client = getSupabaseClient();
         if (view.tab === 'all-time') {
-          result = await fetchLeaderboardBest(client, view.level);
+          result = await fetchLeaderboardSeason(client, view.level);
         } else if (view.tab === 'week') {
-          result = await fetchLeaderboardWeek(client, view.level);
+          result = await fetchLeaderboardSeasonWeek(client, view.level);
         } else {
           if (!view.topic) {
             if (!active) return;
@@ -61,7 +93,7 @@ export function useLeaderboard(view: LeaderboardView, currentUserId: string | nu
             setStatus('ready');
             return;
           }
-          result = await fetchLeaderboardTopic(client, view.level, view.topic);
+          result = await fetchLeaderboardSeasonTopic(client, view.level, view.topic);
         }
       } catch (err) {
         if (!active) return;
@@ -95,6 +127,8 @@ export function useLeaderboard(view: LeaderboardView, currentUserId: string | nu
     entries,
     userRank: rank ? rank.rank : null,
     error,
+    season,
+    seasonError,
     refresh,
   };
 }

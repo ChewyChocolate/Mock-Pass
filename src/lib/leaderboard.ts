@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ExamLevel,
+  ExamSeason,
   LeaderboardEntry,
   LeaderboardTopicEntry,
 } from '../types';
@@ -19,7 +20,15 @@ export function toFiniteScore(value: number | string | null | undefined): number
 
 const DEFAULT_LIMIT = 100;
 
-interface LeaderboardBestRow {
+interface SeasonRow {
+  id: string;
+  label: string;
+  exam_date: string;
+  starts_at: string;
+  ends_at: string;
+}
+
+interface LeaderboardSeasonRow {
   user_id: string;
   handle: string;
   subtitle: string | null;
@@ -51,13 +60,42 @@ export interface FetchLeaderboardTopicResult {
   error?: string;
 }
 
-export async function fetchLeaderboardBest(
+export interface FetchCurrentSeasonResult {
+  ok: boolean;
+  season: ExamSeason | null;
+  error?: string;
+}
+
+export async function fetchCurrentSeason(
+  client: SupabaseClient,
+): Promise<FetchCurrentSeasonResult> {
+  const { data, error } = await client.from('current_season').select('*').maybeSingle();
+  if (error) {
+    return { ok: false, season: null, error: error.message };
+  }
+  if (!data) {
+    return { ok: true, season: null };
+  }
+  const row = data as SeasonRow;
+  return {
+    ok: true,
+    season: {
+      id: row.id,
+      label: row.label,
+      exam_date: row.exam_date,
+      starts_at: row.starts_at,
+      ends_at: row.ends_at,
+    },
+  };
+}
+
+export async function fetchLeaderboardSeason(
   client: SupabaseClient,
   level: ExamLevel,
   limit: number = DEFAULT_LIMIT,
 ): Promise<FetchLeaderboardResult> {
   const { data, error } = await client
-    .from('leaderboard_best')
+    .from('leaderboard_season')
     .select('*')
     .eq('level', level)
     .order('best_score', { ascending: false })
@@ -67,7 +105,7 @@ export async function fetchLeaderboardBest(
     return { ok: false, entries: [], error: error.message };
   }
   const entries = (data ?? []).map((row): LeaderboardEntry => {
-    const r = row as LeaderboardBestRow;
+    const r = row as LeaderboardSeasonRow;
     return {
       user_id: r.user_id,
       handle: r.handle,
@@ -81,13 +119,13 @@ export async function fetchLeaderboardBest(
   return { ok: true, entries };
 }
 
-export async function fetchLeaderboardWeek(
+export async function fetchLeaderboardSeasonWeek(
   client: SupabaseClient,
   level: ExamLevel,
   limit: number = DEFAULT_LIMIT,
 ): Promise<FetchLeaderboardResult> {
   const { data, error } = await client
-    .from('leaderboard_week')
+    .from('leaderboard_season_week')
     .select('*')
     .eq('level', level)
     .order('best_score', { ascending: false })
@@ -97,7 +135,7 @@ export async function fetchLeaderboardWeek(
     return { ok: false, entries: [], error: error.message };
   }
   const entries = (data ?? []).map((row): LeaderboardEntry => {
-    const r = row as LeaderboardBestRow;
+    const r = row as LeaderboardSeasonRow;
     return {
       user_id: r.user_id,
       handle: r.handle,
@@ -111,14 +149,14 @@ export async function fetchLeaderboardWeek(
   return { ok: true, entries };
 }
 
-export async function fetchLeaderboardTopic(
+export async function fetchLeaderboardSeasonTopic(
   client: SupabaseClient,
   level: ExamLevel,
   topic: string,
   limit: number = DEFAULT_LIMIT,
 ): Promise<FetchLeaderboardTopicResult> {
   const { data, error } = await client
-    .from('leaderboard_topic')
+    .from('leaderboard_season_topic')
     .select('*')
     .eq('level', level)
     .eq('topic', topic)
@@ -159,4 +197,51 @@ export function findUserRank(
     }
   }
   return null;
+}
+
+export interface SeasonCountdown {
+  daysUntilExam: number;
+  daysUntilReset: number;
+  isLastDay: boolean;
+}
+
+/**
+ * Compute the countdown to a season's exam and reset moments.
+ *
+ *   daysUntilExam  - whole days from now() to exam_date (midnight UTC).
+ *   daysUntilReset - whole days from now() to ends_at (midnight after exam).
+ *   isLastDay      - true if `now` is the same calendar day as exam_date.
+ *
+ * Negative values are returned as 0 for display (we don't say "-3 days").
+ */
+export function computeSeasonCountdown(
+  season: ExamSeason,
+  now: Date = new Date(),
+): SeasonCountdown {
+  const exam = new Date(season.exam_date);
+  const ends = new Date(season.ends_at);
+  const dayMs = 86_400_000;
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfExam = new Date(exam.getUTCFullYear(), exam.getUTCMonth(), exam.getUTCDate());
+  const startOfEnds = new Date(ends.getUTCFullYear(), ends.getUTCMonth(), ends.getUTCDate());
+
+  const daysUntilExam = Math.max(0, Math.round((startOfExam.getTime() - startOfToday.getTime()) / dayMs));
+  const daysUntilReset = Math.max(0, Math.round((startOfEnds.getTime() - startOfToday.getTime()) / dayMs));
+
+  return {
+    daysUntilExam,
+    daysUntilReset,
+    isLastDay: startOfExam.getTime() === startOfToday.getTime(),
+  };
+}
+
+export function formatSeasonCountdown(season: ExamSeason, now: Date = new Date()): string {
+  const { daysUntilExam, daysUntilReset, isLastDay } = computeSeasonCountdown(season, now);
+  if (isLastDay) return 'Resets tonight';
+  if (daysUntilReset === 0) return 'Resets at midnight';
+  if (daysUntilExam === 0) return 'Exam day';
+  if (daysUntilExam === 1) return '1 day to exam';
+  if (daysUntilReset === 1) return '1 day to reset';
+  return `${daysUntilExam} days to exam`;
 }

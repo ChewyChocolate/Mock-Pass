@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
-import { Crown, Trophy, Calendar, BarChart3, ChevronDown } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import {
+  Crown,
+  Trophy,
+  Calendar,
+  BarChart3,
+  ChevronDown,
+  Hourglass,
+  CalendarRange,
+} from 'lucide-react';
 import { BaseScreenProps, ExamLevel, LEVEL_LABELS, LeaderboardTab, PROFESSIONAL_TOPIC_IDS, TOPIC_SHORT_LABELS } from '../types';
 import MainLayout from '../components/MainLayout';
 import { EmptyState } from '../components/EmptyState';
@@ -9,9 +17,10 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 import { formatDate } from '../utils/format';
 import { pctColorClass } from '../utils/scoreColors';
 import { LIMITS } from '../lib/limits';
+import { formatSeasonCountdown } from '../lib/leaderboard';
 
 const TABS: { id: LeaderboardTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'all-time', label: 'All-Time', icon: <Trophy className="w-4 h-4" /> },
+  { id: 'all-time', label: 'Active Season', icon: <Trophy className="w-4 h-4" /> },
   { id: 'week', label: 'This Week', icon: <Calendar className="w-4 h-4" /> },
   { id: 'topic', label: 'Per Topic', icon: <BarChart3 className="w-4 h-4" /> },
 ];
@@ -25,10 +34,20 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
     examState.level === 'professional' ? PROFESSIONAL_TOPIC_IDS[0] : 'Verbal Ability',
   );
 
-  const { status, entries, userRank, error } = useLeaderboard(
+  const { status, entries, userRank, error, season, seasonError } = useLeaderboard(
     { tab, level, topic: tab === 'topic' ? topic : null },
     user?.id ?? null,
   );
+
+  const seasonLabel = useMemo(() => {
+    if (!season) return null;
+    return season.label;
+  }, [season]);
+
+  const seasonCountdown = useMemo(() => {
+    if (!season) return null;
+    return formatSeasonCountdown(season);
+  }, [season]);
 
   const handleLevelChange = (next: ExamLevel) => {
     setLevel(next);
@@ -45,10 +64,59 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
             Leaderboard
           </h1>
           <p className="text-on-surface-variant max-w-2xl">
-            See how you stack up against other reviewers. Submissions are public; handles are
-            how you appear on the board.
+            See how you stack up against reviewers cramming for the same exam.
+            The board resets the day after each major Civil Service exam.
           </p>
         </div>
+
+        {season ? (
+          <div className="mb-6 p-5 bg-terracotta-container/30 border border-terracotta/30 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-terracotta-container border border-terracotta flex items-center justify-center shrink-0">
+                <CalendarRange className="w-5 h-5 text-terracotta" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-terracotta">
+                  Active Exam Season
+                </p>
+                <p className="text-base font-bold text-on-surface">{seasonLabel}</p>
+                <p className="text-xs text-on-surface-variant">
+                  Exam on {formatDate(new Date(season.exam_date).getTime())} · Board resets the day after
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 sm:text-right">
+              <Hourglass className="w-5 h-5 text-terracotta" />
+              <span className="text-sm font-bold text-on-surface">
+                {seasonCountdown}
+              </span>
+            </div>
+          </div>
+        ) : seasonError ? (
+          <div className="mb-6 p-4 bg-error-container/30 border border-error/30 rounded-lg">
+            <p className="text-xs text-error">
+              Could not load the current exam season. Make sure
+              <code className="px-1 mx-1 bg-surface-container rounded font-mono">supabase/leaderboard.sql</code>
+              has been run in the Supabase SQL editor.
+            </p>
+          </div>
+        ) : (
+          <div className="mb-6 p-5 bg-surface-container-low border border-outline-variant rounded-lg flex items-start gap-3">
+            <div className="w-10 h-10 bg-surface-container border border-outline-variant flex items-center justify-center shrink-0">
+              <CalendarRange className="w-5 h-5 text-on-surface-variant" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                No active exam season
+              </p>
+              <p className="text-sm text-on-surface">
+                The leaderboard is paused between exam batches. Add a new
+                <code className="px-1 mx-1 bg-surface-container rounded font-mono">exam_seasons</code>
+                row in Supabase to start the next competition.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-sm self-start">
@@ -133,9 +201,11 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
             title="No submissions yet"
             description={
               tab === 'week'
-                ? 'Be the first reviewer to land on the weekly board.'
+                ? 'Be the first reviewer to land on the weekly board this season.'
                 : tab === 'topic'
-                ? 'No one has submitted an attempt for this topic yet.'
+                ? 'No one has submitted an attempt for this topic this season.'
+                : season
+                ? `Be the first to claim the top spot for ${season.label}.`
                 : 'Be the first to claim the top spot.'
             }
             titleAs="h2"

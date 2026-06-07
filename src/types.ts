@@ -114,3 +114,11 @@ export interface LeaderboardTopicEntry {
   best_topic_pct: number | string;
   best_submitted_at: number;
 }
+
+export interface ExamSeason {
+  id: string;
+  label: string;
+  exam_date: string;
+  starts_at: string;
+  ends_at: string;
+}

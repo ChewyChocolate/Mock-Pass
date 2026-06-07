@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, Crown, Trophy, Users } from 'lucide-react';
+import { ArrowRight, Crown, Trophy, Users, CalendarRange, Hourglass } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useExam } from '../context/ExamContext';
 import {
-  fetchLeaderboardWeek,
+  fetchCurrentSeason,
+  fetchLeaderboardSeasonWeek,
+  formatSeasonCountdown,
+  type FetchCurrentSeasonResult,
   type FetchLeaderboardResult,
 } from '../lib/leaderboard';
 import { getSupabaseClient } from '../lib/supabase';
 import { LIMITS } from '../lib/limits';
-import type { LeaderboardEntry } from '../types';
+import type { ExamSeason, LeaderboardEntry } from '../types';
 import { formatDate } from '../utils/format';
 import { pctColorClass } from '../utils/scoreColors';
 
@@ -20,6 +23,7 @@ export default function LeaderboardWidget({ onNavigate }: LeaderboardWidgetProps
   const { user } = useAuth();
   const { state } = useExam();
   const [result, setResult] = useState<FetchLeaderboardResult | null>(null);
+  const [seasonResult, setSeasonResult] = useState<FetchCurrentSeasonResult | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,12 +32,18 @@ export default function LeaderboardWidget({ onNavigate }: LeaderboardWidgetProps
     (async () => {
       try {
         const client = getSupabaseClient();
-        const r = await fetchLeaderboardWeek(
-          client,
-          state.level,
-          Math.max(LIMITS.leaderboardWidgetRows, 50),
-        );
-        if (active) setResult(r);
+        const [board, season] = await Promise.all([
+          fetchLeaderboardSeasonWeek(
+            client,
+            state.level,
+            Math.max(LIMITS.leaderboardWidgetRows, 50),
+          ),
+          fetchCurrentSeason(client),
+        ]);
+        if (active) {
+          setResult(board);
+          setSeasonResult(season);
+        }
       } catch (err) {
         if (active) {
           setResult({
@@ -41,6 +51,7 @@ export default function LeaderboardWidget({ onNavigate }: LeaderboardWidgetProps
             entries: [],
             error: err instanceof Error ? err.message : 'Failed to load leaderboard.',
           });
+          setSeasonResult({ ok: false, season: null });
         }
       } finally {
         if (active) setLoading(false);
@@ -62,20 +73,43 @@ export default function LeaderboardWidget({ onNavigate }: LeaderboardWidgetProps
     ? entries.findIndex((e) => e.user_id === userEntry.user_id) + 1
     : null;
 
+  const season: ExamSeason | null = seasonResult?.ok ? seasonResult.season : null;
+  const seasonLine = season ? season.label : 'Current season';
+  const countdown = season ? formatSeasonCountdown(season) : null;
+
   return (
     <section className="bg-surface-container-low border border-outline-variant rounded-lg overflow-hidden mb-12">
-      <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-container/30">
-        <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-terracotta" />
-          Leaderboard · This Week
-        </h3>
-        <button
-          onClick={() => onNavigate('leaderboard')}
-          className="text-primary text-xs font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"
-        >
-          View Full
-          <ArrowRight className="w-3 h-3" />
-        </button>
+      <div className="p-6 border-b border-outline-variant flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-surface-container/30">
+        <div>
+          <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-terracotta" />
+            Active Season · {seasonLine}
+          </h3>
+          {season ? (
+            <p className="text-xs text-on-surface-variant mt-1">
+              Exam on {formatDate(new Date(season.exam_date).getTime())} · board resets the day after
+            </p>
+          ) : (
+            <p className="text-xs text-on-surface-variant mt-1">
+              No active season configured
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {countdown ? (
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-terracotta">
+              <Hourglass className="w-4 h-4" />
+              {countdown}
+            </span>
+          ) : null}
+          <button
+            onClick={() => onNavigate('leaderboard')}
+            className="text-primary text-xs font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"
+          >
+            View Full
+            <ArrowRight className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3">
@@ -107,7 +141,9 @@ export default function LeaderboardWidget({ onNavigate }: LeaderboardWidgetProps
             <p className="text-sm text-on-surface-variant">Loading this week's top scorers…</p>
           ) : topThree.length === 0 ? (
             <p className="text-sm text-on-surface-variant">
-              No submissions yet this week. Be the first to claim the top spot.
+              {season
+                ? `No submissions yet for ${season.label}. Be the first to claim the top spot.`
+                : 'No submissions yet this season.'}
             </p>
           ) : (
             <ol className="space-y-2">
