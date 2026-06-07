@@ -44,6 +44,7 @@ describe('buildInitialAuthState', () => {
     expect(state.status).toBe('unconfigured');
     expect(state.user).toBeNull();
     expect(state.session).toBeNull();
+    expect(state.recoveryMode).toBe(false);
     expect(state.error).toBeNull();
   });
 
@@ -53,6 +54,7 @@ describe('buildInitialAuthState', () => {
     expect(state.status).toBe('signed-in');
     expect(state.session).toBe(session);
     expect(state.user).toBe(session.user);
+    expect(state.recoveryMode).toBe(false);
   });
 
   it('returns signed-out state when configured but no session', () => {
@@ -60,5 +62,12 @@ describe('buildInitialAuthState', () => {
     expect(state.status).toBe('signed-out');
     expect(state.user).toBeNull();
     expect(state.session).toBeNull();
+    expect(state.recoveryMode).toBe(false);
+  });
+
+  it('always initializes recoveryMode to false (it is only set by PASSWORD_RECOVERY event)', () => {
+    expect(buildInitialAuthState(false, null).recoveryMode).toBe(false);
+    expect(buildInitialAuthState(true, null).recoveryMode).toBe(false);
+    expect(buildInitialAuthState(true, makeSession()).recoveryMode).toBe(false);
   });
 });

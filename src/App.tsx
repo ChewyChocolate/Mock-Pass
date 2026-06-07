@@ -10,12 +10,13 @@ import ReviewScreen from './screens/ReviewScreen';
 import ExamScreen from './screens/ExamScreen';
 import PerformanceScreen from './screens/PerformanceScreen';
 import SupportScreen from './screens/SupportScreen';
+import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import './index.css';
 
 function Router() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const { state } = useExam();
-  const { isSignedIn, isLoading } = useAuth();
+  const { isSignedIn, isLoading, recoveryMode } = useAuth();
   const initialized = useRef(false);
   const prevStatus = useRef(state.status);
   const prevSignedIn = useRef<boolean | null>(null);
@@ -51,6 +52,7 @@ function Router() {
     window.scrollTo(0, 0);
   };
 
+  if (recoveryMode) return <ResetPasswordScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'login') return <LoginScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'dashboard') return <DashboardScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'review') return <ReviewScreen onNavigate={handleNavigate} />;

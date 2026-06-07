@@ -23,6 +23,7 @@ export interface AuthState {
   status: AuthStatus;
   user: User | null;
   session: Session | null;
+  recoveryMode: boolean;
   error: string | null;
 }
 
@@ -33,6 +34,9 @@ export interface AuthContextValue extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, profile?: UserProfile) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPasswordForEmail: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
+  exitRecoveryMode: () => void;
   clearError: () => void;
 }
 
@@ -51,12 +55,13 @@ export function buildInitialAuthState(
   initialSession: Session | null,
 ): AuthState {
   if (!configured) {
-    return { status: 'unconfigured', user: null, session: null, error: null };
+    return { status: 'unconfigured', user: null, session: null, recoveryMode: false, error: null };
   }
   return {
     status: initialSession ? 'signed-in' : 'signed-out',
     user: initialSession?.user ?? null,
     session: initialSession,
+    recoveryMode: false,
     error: null,
   };
 }
@@ -65,6 +70,7 @@ const initialUnconfigured: AuthState = {
   status: 'unconfigured',
   user: null,
   session: null,
+  recoveryMode: false,
   error: null,
 };
 
@@ -115,13 +121,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initialize();
 
-    const { data: sub } = client.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = client.auth.onAuthStateChange((event, newSession) => {
       if (!active) return;
+      if (event === 'PASSWORD_RECOVERY') {
+        setState((prev) => ({
+          ...prev,
+          status: 'signed-in',
+          user: newSession?.user ?? null,
+          session: newSession,
+          recoveryMode: true,
+          error: null,
+        }));
+        setDevAuthUser(newSession?.user ?? null);
+        return;
+      }
+      if (event === 'SIGNED_OUT') {
+        setState((prev) => ({
+          ...prev,
+          status: 'signed-out',
+          user: null,
+          session: null,
+          recoveryMode: false,
+          error: null,
+        }));
+        setDevAuthUser(null);
+        return;
+      }
       setState((prev) => ({
         ...prev,
         status: newSession ? 'signed-in' : 'signed-out',
         user: newSession?.user ?? null,
         session: newSession,
+        recoveryMode: false,
         error: null,
       }));
       setDevAuthUser(newSession?.user ?? null);
@@ -164,6 +195,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message);
   }, []);
 
+  const resetPasswordForEmail = useCallback(async (email: string) => {
+    if (!clientRef.current) {
+      throw new SupabaseConfigError('Supabase is not configured.');
+    }
+    const { error } = await clientRef.current.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname,
+    });
+    if (error) throw new Error(error.message);
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string) => {
+    if (!clientRef.current) {
+      throw new SupabaseConfigError('Supabase is not configured.');
+    }
+    const { error } = await clientRef.current.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
+  }, []);
+
+  const exitRecoveryMode = useCallback(() => {
+    setState((prev) => ({ ...prev, recoveryMode: false }));
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const { pathname, search } = window.location;
+      window.history.replaceState(null, '', pathname + search);
+    }
+  }, []);
+
   const clearError = useCallback(() => {
     setState((prev) => ({ ...prev, error: null }));
   }, []);
@@ -177,9 +234,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       signOut,
+      resetPasswordForEmail,
+      updatePassword,
+      exitRecoveryMode,
       clearError,
     }),
-    [state, configured, signIn, signUp, signOut, clearError],
+    [
+      state,
+      configured,
+      signIn,
+      signUp,
+      signOut,
+      resetPasswordForEmail,
+      updatePassword,
+      exitRecoveryMode,
+      clearError,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
