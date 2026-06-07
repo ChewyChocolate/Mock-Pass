@@ -12,9 +12,14 @@ section scoring, persistent local history, and a topic-by-topic breakdown.
 
 - **Auth + cross-device sync** — sign in with email + password; completed exam
   sessions sync to Supabase so you can resume across devices.
-- **Public leaderboard** — All-Time, This Week, and Per-Topic boards (Verbal,
-  Analytical, Numerical, General). Each user gets a unique public handle and
-  a privacy-preserving name subtitle (e.g. `chewy_choc` over `MA...A D`).
+- **Public leaderboard (Active Exam Season)** — the board resets the day after
+  each major Civil Service exam, so reviewers compete against the current
+  batch cramming for the same test date (not against users who already sat
+  and passed a previous one). Three boards: **Active Season** (best score
+  this season), **This Week** (best score in the last 7 days, within the
+  active season), and **Per-Topic** (best per-topic accuracy, within the
+  active season). Each user gets a unique public handle and a
+  privacy-preserving name subtitle (e.g. `chewy_choc` over `MA...A D`).
 - **150-item timed mock** with weighted section scoring (Verbal 30%, Analytical
   35%, Numerical 30%, General Info 5%).
 - **Topic-by-topic breakdown** of strengths and weaknesses.
@@ -102,9 +107,11 @@ maps. No manual env-var management required.
 ## Project Layout
 
 - `supabase/schema.sql` — `exam_sessions` table + RLS policies.
-- `supabase/leaderboard.sql` — `profiles` table + `leaderboard_best`,
-  `leaderboard_week`, `leaderboard_topic` views + `is_handle_available` RPC.
-  Run this **after** `schema.sql` in the Supabase SQL editor.
+- `supabase/leaderboard.sql` — `profiles` table + `exam_seasons` table +
+  `current_season` view + `leaderboard_season` / `leaderboard_season_week` /
+  `leaderboard_season_topic` views + `is_handle_available` RPC. Run this
+  **after** `schema.sql` in the Supabase SQL editor. Add a new
+  `exam_seasons` row for each upcoming CSE; the active board auto-switches.
 - `src/lib/supabase.ts` — browser client + env validation.
 - `src/lib/sync.ts` — `fetchRemoteHistory`, `pushSession`, row↔summary mappers.
 - `src/context/AuthContext.tsx` — Supabase Auth state, `useAuth()` hook.
