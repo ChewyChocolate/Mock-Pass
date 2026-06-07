@@ -292,7 +292,10 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                         <button
                           role="menuitem"
                           className="w-full px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-variant flex items-center gap-2"
-                          onClick={() => setMenuOpen(false)}
+                          onClick={() => {
+                            setMenuOpen(false);
+                            onNavigate('profile');
+                          }}
                         >
                           <User className="w-4 h-4" />
                           Profile

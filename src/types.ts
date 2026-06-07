@@ -1,4 +1,4 @@
-export type Screen = 'login' | 'dashboard' | 'review' | 'exam' | 'performance' | 'support';
+export type Screen = 'login' | 'dashboard' | 'review' | 'exam' | 'performance' | 'support' | 'profile';
 
 export interface BaseScreenProps {
   onNavigate: (screen: Screen) => void;

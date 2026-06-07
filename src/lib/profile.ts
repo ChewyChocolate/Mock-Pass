@@ -1,4 +1,7 @@
 import type { User } from '@supabase/supabase-js';
+import type { UserProfile } from '../types';
+
+export type { UserProfile };
 
 /**
  * The shape of `user.user_metadata` fields we read for personalization.
@@ -30,4 +33,24 @@ export function deriveDisplayName(user: User | null | undefined): string | null 
   const candidate = (meta?.first_name ?? meta?.full_name ?? meta?.name ?? '').trim();
   if (!candidate) return null;
   return candidate.split(/\s+/)[0]?.slice(0, MAX_DISPLAY_NAME_LENGTH) || null;
+}
+
+/**
+ * Build the `options.data` payload for `supabase.auth.signUp` /
+ * `supabase.auth.updateUser`. Trims whitespace, drops empty fields, and
+ * returns a plain object suitable for spreading into `options.data`.
+ *
+ * Empty fields are omitted (not written as `""`) so that the JSONB
+ * metadata never stores empty strings — Supabase's signUp accepts `""`
+ * and the resulting user would later see the empty value in
+ * `user_metadata`.
+ */
+export function normalizeProfile(profile: UserProfile | undefined): Record<string, string> {
+  const data: Record<string, string> = {};
+  if (!profile) return data;
+  const first = profile.first_name?.trim();
+  const last = profile.last_name?.trim();
+  if (first) data.first_name = first;
+  if (last) data.last_name = last;
+  return data;
 }

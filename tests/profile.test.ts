@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { User } from '@supabase/supabase-js';
-import { deriveDisplayName, type ProfileMetadata } from '../src/lib/profile';
+import { deriveDisplayName, normalizeProfile, type ProfileMetadata } from '../src/lib/profile';
 
 function fakeUser(metadata: ProfileMetadata | undefined): User {
   return {
@@ -76,5 +76,58 @@ describe('deriveDisplayName', () => {
 
   it('handles a single-character name', () => {
     expect(deriveDisplayName(fakeUser({ first_name: 'A' }))).toBe('A');
+  });
+});
+
+describe('normalizeProfile', () => {
+  it('returns an empty object for undefined input', () => {
+    expect(normalizeProfile(undefined)).toEqual({});
+  });
+
+  it('returns an empty object for an empty input', () => {
+    expect(normalizeProfile({})).toEqual({});
+  });
+
+  it('returns an empty object when both fields are empty strings', () => {
+    expect(normalizeProfile({ first_name: '', last_name: '' })).toEqual({});
+  });
+
+  it('returns an empty object when both fields are whitespace', () => {
+    expect(normalizeProfile({ first_name: '   ', last_name: '\t\n' })).toEqual({});
+  });
+
+  it('trims surrounding whitespace from both fields', () => {
+    expect(normalizeProfile({ first_name: '  Juan  ', last_name: '  Cruz  ' })).toEqual({
+      first_name: 'Juan',
+      last_name: 'Cruz',
+    });
+  });
+
+  it('omits a field when its trimmed value is empty', () => {
+    expect(normalizeProfile({ first_name: 'Juan', last_name: '   ' })).toEqual({
+      first_name: 'Juan',
+    });
+    expect(normalizeProfile({ first_name: '', last_name: 'Cruz' })).toEqual({
+      last_name: 'Cruz',
+    });
+  });
+
+  it('includes both fields when both are non-empty after trim', () => {
+    expect(normalizeProfile({ first_name: 'Juan', last_name: 'Cruz' })).toEqual({
+      first_name: 'Juan',
+      last_name: 'Cruz',
+    });
+  });
+
+  it('preserves Unicode characters and internal whitespace when trimming', () => {
+    expect(normalizeProfile({ first_name: '  José  ', last_name: 'Müller' })).toEqual({
+      first_name: 'José',
+      last_name: 'Müller',
+    });
+  });
+
+  it('never writes empty strings to the payload (Supabase would store them as "")', () => {
+    const payload = normalizeProfile({ first_name: '  ', last_name: 'Cruz' });
+    expect(Object.values(payload)).not.toContain('');
   });
 });

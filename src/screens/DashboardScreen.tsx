@@ -113,22 +113,37 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
         <section className="relative bg-primary-container rounded-lg overflow-hidden mb-12 border border-outline-variant/30 flex flex-col justify-center min-h-[280px]">
           <div className="p-8 md:p-12 relative z-20 w-full">
             <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4 tracking-tight">
-              {displayName ? `Welcome back, ${displayName}!` : 'Welcome back!'}
+              {displayName
+                ? hasHistory
+                  ? `Welcome back, ${displayName}!`
+                  : `Welcome, ${displayName}!`
+                : 'Welcome back!'}
             </h2>
             <p className="text-lg text-on-primary-container max-w-lg mb-8 leading-relaxed">
               {hasHistory
                 ? `You've completed ${history.length} mock ${history.length === 1 ? 'exam' : 'exams'} so far. Keep the streak going.`
                 : 'Your path to civil service excellence starts here. Take a mock exam to see your baseline score.'}
             </p>
-            <div className="w-full max-w-md">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-semibold text-primary uppercase tracking-widest">
-                  Weekly Goal · {lastSevenDays.sessions}/{LIMITS.weeklyGoalSessions} sessions
-                </span>
-                <span className="text-xs font-bold text-primary">{lastSevenDays.progress}%</span>
+            {hasHistory ? (
+              <div className="w-full max-w-md">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-semibold text-primary uppercase tracking-widest">
+                    Weekly Goal · {lastSevenDays.sessions}/{LIMITS.weeklyGoalSessions} sessions
+                  </span>
+                  <span className="text-xs font-bold text-primary">{lastSevenDays.progress}%</span>
+                </div>
+                <div className="step-indicator rounded-sm"></div>
               </div>
-              <div className="step-indicator rounded-sm"></div>
-            </div>
+            ) : (
+              <button
+                onClick={handleStart}
+                disabled={!LEVEL_OPTIONS.find((o) => o.id === state.level)?.available}
+                className="mechanical-button bg-primary text-on-primary px-8 py-4 rounded font-semibold text-base hover:bg-primary-fixed-dim active:scale-95 transition-all shadow-lg inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Start Your First Exam
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            )}
           </div>
           <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary to-transparent blur-2xl pointer-events-none"></div>
         </section>

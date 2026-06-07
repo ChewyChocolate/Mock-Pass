@@ -16,6 +16,7 @@ import {
 } from '../lib/supabase';
 import { setDevAuthUser } from '../utils/devAuth';
 import type { UserProfile } from '../types';
+import { normalizeProfile } from '../lib/profile';
 
 export type AuthStatus = 'unconfigured' | 'loading' | 'signed-out' | 'signed-in';
 
@@ -34,6 +35,7 @@ export interface AuthContextValue extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, profile?: UserProfile) => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (profile: UserProfile) => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
   exitRecoveryMode: () => void;
@@ -176,16 +178,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!clientRef.current) {
       throw new SupabaseConfigError('Supabase is not configured.');
     }
-    const data: Record<string, string> = {};
-    const first = profile?.first_name?.trim();
-    const last = profile?.last_name?.trim();
-    if (first) data.first_name = first;
-    if (last) data.last_name = last;
+    const data = normalizeProfile(profile);
     const { error } = await clientRef.current.auth.signUp({
       email,
       password,
       options: { data },
     });
+    if (error) throw new Error(error.message);
+  }, []);
+
+  const updateProfile = useCallback(async (profile: UserProfile) => {
+    if (!clientRef.current) {
+      throw new SupabaseConfigError('Supabase is not configured.');
+    }
+    const data = normalizeProfile(profile);
+    const { error } = await clientRef.current.auth.updateUser({ data });
     if (error) throw new Error(error.message);
   }, []);
 
@@ -234,6 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       signOut,
+      updateProfile,
       resetPasswordForEmail,
       updatePassword,
       exitRecoveryMode,
@@ -245,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       signOut,
+      updateProfile,
       resetPasswordForEmail,
       updatePassword,
       exitRecoveryMode,
