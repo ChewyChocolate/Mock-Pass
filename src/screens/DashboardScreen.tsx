@@ -30,6 +30,7 @@ import {
 import { usePerformanceStats } from '../hooks/usePerformanceStats';
 import { formatDuration, formatHours } from '../utils/format';
 import { LIMITS } from '../lib/limits';
+import { deriveDisplayName } from '../lib/profile';
 
 type LevelOption = {
   id: ExamLevel;
@@ -88,12 +89,7 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
     return { progress, sessions: recent.length };
   }, [history]);
 
-  const displayName = useMemo(() => {
-    const meta = user?.user_metadata as { full_name?: string; name?: string } | undefined;
-    const fullName = (meta?.full_name ?? meta?.name ?? '').trim();
-    if (!fullName) return null;
-    return fullName.split(/\s+/)[0]?.slice(0, 30) || null;
-  }, [user]);
+  const displayName = useMemo(() => deriveDisplayName(user), [user]);
 
   const hasHistory = stats.hasHistory;
   const inProgress = state.status === 'in-progress';

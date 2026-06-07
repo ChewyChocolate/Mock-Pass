@@ -6,6 +6,11 @@ export interface BaseScreenProps {
 
 export type ExamLevel = 'sub-professional' | 'professional';
 
+export interface UserProfile {
+  first_name?: string;
+  last_name?: string;
+}
+
 export const LEVEL_LABELS: Record<ExamLevel, string> = {
   'sub-professional': 'Sub-Professional',
   'professional': 'Professional',

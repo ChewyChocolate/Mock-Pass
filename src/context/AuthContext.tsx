@@ -15,6 +15,7 @@ import {
   SupabaseConfigError,
 } from '../lib/supabase';
 import { setDevAuthUser } from '../utils/devAuth';
+import type { UserProfile } from '../types';
 
 export type AuthStatus = 'unconfigured' | 'loading' | 'signed-out' | 'signed-in';
 
@@ -30,7 +31,7 @@ export interface AuthContextValue extends AuthState {
   isLoading: boolean;
   isSignedIn: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, profile?: UserProfile) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -140,11 +141,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message);
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string, profile?: UserProfile) => {
     if (!clientRef.current) {
       throw new SupabaseConfigError('Supabase is not configured.');
     }
-    const { error } = await clientRef.current.auth.signUp({ email, password });
+    const data: Record<string, string> = {};
+    const first = profile?.first_name?.trim();
+    const last = profile?.last_name?.trim();
+    if (first) data.first_name = first;
+    if (last) data.last_name = last;
+    const { error } = await clientRef.current.auth.signUp({
+      email,
+      password,
+      options: { data },
+    });
     if (error) throw new Error(error.message);
   }, []);
 

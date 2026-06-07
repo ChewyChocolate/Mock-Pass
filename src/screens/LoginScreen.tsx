@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { BaseScreenProps } from '../types';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, PenTool, Sun, Moon } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, PenTool, Sun, Moon, User } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,8 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [mode, setMode] = useState<Mode>('sign-in');
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,7 +31,7 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
       if (mode === 'sign-in') {
         await signIn(email, password);
       } else {
-        await signUp(email, password);
+        await signUp(email, password, { first_name: firstName, last_name: lastName });
       }
       onNavigate('dashboard');
     } catch (err) {
@@ -42,6 +44,8 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
 
   const switchMode = () => {
     clearError();
+    setFirstName('');
+    setLastName('');
     setMode((m) => (m === 'sign-in' ? 'sign-up' : 'sign-in'));
   };
 
@@ -74,6 +78,50 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit}>
+
+            {/* Name Fields (sign-up only) */}
+            {mode === 'sign-up' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden"
+              >
+                <div className="space-y-2">
+                  <label
+                    className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase flex items-center gap-1"
+                    htmlFor="firstName"
+                  >
+                    <User className="w-3 h-3" />
+                    First Name <span className="opacity-50 normal-case font-normal">· optional</span>
+                  </label>
+                  <div className="relative custom-focus transition-all duration-300 border border-outline-variant rounded bg-surface-container-low overflow-hidden">
+                    <input
+                      className="input-textured w-full bg-transparent border-none px-4 py-3 text-on-surface placeholder:text-outline/50 focus:outline-none focus:ring-0 text-base"
+                      id="firstName" type="text" placeholder="Juan"
+                      value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                      autoComplete="given-name" maxLength={50}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label
+                    className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase"
+                    htmlFor="lastName"
+                  >
+                    Last Name <span className="opacity-50 normal-case font-normal">· optional</span>
+                  </label>
+                  <div className="relative custom-focus transition-all duration-300 border border-outline-variant rounded bg-surface-container-low overflow-hidden">
+                    <input
+                      className="input-textured w-full bg-transparent border-none px-4 py-3 text-on-surface placeholder:text-outline/50 focus:outline-none focus:ring-0 text-base"
+                      id="lastName" type="text" placeholder="Dela Cruz"
+                      value={lastName} onChange={(e) => setLastName(e.target.value)}
+                      autoComplete="family-name" maxLength={50}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {/* Email Field */}
             <div className="space-y-2 group">
