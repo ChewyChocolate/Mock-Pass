@@ -12,6 +12,7 @@ import PerformanceScreen from './screens/PerformanceScreen';
 import SupportScreen from './screens/SupportScreen';
 import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import LeaderboardScreen from './screens/LeaderboardScreen';
 import './index.css';
 
 function Router() {
@@ -60,6 +61,7 @@ function Router() {
   if (currentScreen === 'performance') return <PerformanceScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'support') return <SupportScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'profile') return <ProfileScreen onNavigate={handleNavigate} />;
+  if (currentScreen === 'leaderboard') return <LeaderboardScreen onNavigate={handleNavigate} />;
   return <ExamScreen onNavigate={handleNavigate} />;
 }
 

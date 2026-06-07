@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BaseScreenProps, Screen } from '../types';
 import React from 'react';
-import { HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check } from 'lucide-react';
+import { HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check, Trophy } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from './Modal';
@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
   { id: 'review', label: 'Review Results', icon: <FileQuestion className="w-5 h-5" /> },
   { id: 'performance', label: 'Performance', icon: <BarChart2 className="w-5 h-5" /> },
+  { id: 'leaderboard', label: 'Leaderboard', icon: <Trophy className="w-5 h-5" /> },
   { id: 'support', label: 'Support', icon: <HelpCircle className="w-5 h-5" /> },
 ];
 

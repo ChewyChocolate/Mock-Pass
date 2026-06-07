@@ -1,14 +1,31 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { BaseScreenProps } from '../types';
-import { User, Mail, Save, Lock, Check, ArrowRight } from 'lucide-react';
+import { User, Mail, Save, Lock, Check, ArrowRight, AtSign, Loader2, X } from 'lucide-react';
 import MainLayout from '../components/MainLayout';
 import { SectionCard } from '../components/SectionCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { useAuth } from '../context/AuthContext';
 import { deriveDisplayName } from '../lib/profile';
+import { validateHandle } from '../lib/handle';
+import { getSupabaseClient } from '../lib/supabase';
+
+type HandleStatus =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'available' }
+  | { kind: 'taken' }
+  | { kind: 'invalid'; error: string };
 
 export default function ProfileScreen({ onNavigate }: BaseScreenProps) {
-  const { user, updateProfile, resetPasswordForEmail, error, clearError } = useAuth();
+  const {
+    user,
+    updateProfile,
+    resetPasswordForEmail,
+    setHandle: setAuthHandle,
+    handle: currentHandle,
+    error,
+    clearError,
+  } = useAuth();
 
   const initialFirst = (user?.user_metadata as { first_name?: string } | undefined)?.first_name ?? '';
   const initialLast = (user?.user_metadata as { last_name?: string } | undefined)?.last_name ?? '';
@@ -21,6 +38,56 @@ export default function ProfileScreen({ onNavigate }: BaseScreenProps) {
 
   const [sendingReset, setSendingReset] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+
+  const [handleInput, setHandleInput] = useState(currentHandle ?? '');
+  const [handleStatus, setHandleStatus] = useState<HandleStatus>({ kind: 'idle' });
+  const [savingHandle, setSavingHandle] = useState(false);
+  const [handleSuccess, setHandleSuccess] = useState(false);
+  const handleCheckSeq = useRef(0);
+
+  useEffect(() => {
+    setHandleInput(currentHandle ?? '');
+  }, [currentHandle]);
+
+  useEffect(() => {
+    const trimmed = handleInput.trim().toLowerCase();
+    if (trimmed === '' && !currentHandle) {
+      setHandleStatus({ kind: 'idle' });
+      return;
+    }
+    if (trimmed === (currentHandle ?? '').toLowerCase()) {
+      setHandleStatus({ kind: 'idle' });
+      return;
+    }
+    const validation = validateHandle(handleInput);
+    if (!validation.ok) {
+      setHandleStatus({ kind: 'invalid', error: validation.error ?? 'Invalid handle.' });
+      return;
+    }
+    const seq = ++handleCheckSeq.current;
+    setHandleStatus({ kind: 'checking' });
+    const timer = window.setTimeout(async () => {
+      try {
+        const client = getSupabaseClient();
+        const { data, error: rpcError } = await client.rpc('is_handle_available', {
+          handle: trimmed,
+        });
+        if (handleCheckSeq.current !== seq) return;
+        if (rpcError) {
+          setHandleStatus({ kind: 'invalid', error: rpcError.message });
+          return;
+        }
+        setHandleStatus(data ? { kind: 'available' } : { kind: 'taken' });
+      } catch (err) {
+        if (handleCheckSeq.current !== seq) return;
+        setHandleStatus({
+          kind: 'invalid',
+          error: err instanceof Error ? err.message : 'Could not check availability.',
+        });
+      }
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [handleInput, currentHandle]);
 
   const hasNameChanges =
     firstName.trim() !== initialFirst.trim() || lastName.trim() !== initialLast.trim();
@@ -41,6 +108,24 @@ export default function ProfileScreen({ onNavigate }: BaseScreenProps) {
     }
   };
 
+  const handleHandleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (savingHandle) return;
+    if (handleStatus.kind !== 'available' && handleStatus.kind !== 'idle') return;
+    if (handleInput.trim().toLowerCase() === (currentHandle ?? '').toLowerCase()) return;
+    setSavingHandle(true);
+    setHandleSuccess(false);
+    clearError();
+    try {
+      await setAuthHandle(handleInput);
+      setHandleSuccess(true);
+    } catch (err) {
+      void err;
+    } finally {
+      setSavingHandle(false);
+    }
+  };
+
   const handleSendReset = async () => {
     if (sendingReset || !email) return;
     setSendingReset(true);
@@ -57,6 +142,9 @@ export default function ProfileScreen({ onNavigate }: BaseScreenProps) {
   };
 
   const displayName = deriveDisplayName(user);
+  const handleDirty =
+    handleInput.trim().toLowerCase() !== (currentHandle ?? '').toLowerCase();
+  const handleCanSave = handleDirty && (handleStatus.kind === 'available' || handleStatus.kind === 'idle');
 
   return (
     <MainLayout onNavigate={onNavigate} currentScreen="profile">
@@ -179,6 +267,87 @@ export default function ProfileScreen({ onNavigate }: BaseScreenProps) {
                 >
                   <Save className="w-4 h-4" />
                   {savingProfile ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </SectionCard>
+
+          <SectionCard>
+            <SectionHeader
+              icon={<AtSign className="w-5 h-5 text-primary" />}
+              title="Public Handle"
+              subtitle="How you appear on the leaderboard. 3-20 chars, lowercase letters, numbers, underscores."
+            />
+            <form onSubmit={handleHandleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase"
+                  htmlFor="profileHandle"
+                >
+                  Handle
+                </label>
+                <div className="relative custom-focus transition-all duration-300 border border-outline-variant rounded bg-surface-container-low overflow-hidden">
+                  <input
+                    className="input-textured w-full bg-transparent border-none pl-10 pr-12 py-3 text-on-surface placeholder:text-outline/50 focus:outline-none focus:ring-0 text-base font-mono"
+                    id="profileHandle"
+                    type="text"
+                    placeholder="chewy_choc"
+                    value={handleInput}
+                    onChange={(e) => {
+                      setHandleInput(e.target.value);
+                      setHandleSuccess(false);
+                    }}
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={20}
+                  />
+                  <AtSign className="w-4 h-4 text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {handleStatus.kind === 'checking' && (
+                      <Loader2 className="w-4 h-4 text-on-surface-variant animate-spin" />
+                    )}
+                    {handleStatus.kind === 'available' && (
+                      <Check className="w-4 h-4 text-tertiary" />
+                    )}
+                    {(handleStatus.kind === 'taken' || handleStatus.kind === 'invalid') && (
+                      <X className="w-4 h-4 text-error" />
+                    )}
+                  </span>
+                </div>
+                <div className="min-h-[20px] text-xs">
+                  {handleStatus.kind === 'available' && (
+                    <p className="text-tertiary">Available</p>
+                  )}
+                  {handleStatus.kind === 'taken' && (
+                    <p className="text-error">That handle is already taken.</p>
+                  )}
+                  {handleStatus.kind === 'invalid' && (
+                    <p className="text-error">{handleStatus.error}</p>
+                  )}
+                  {handleStatus.kind === 'idle' && currentHandle && (
+                    <p className="text-on-surface-variant">This is your current handle.</p>
+                  )}
+                </div>
+              </div>
+
+              {handleSuccess && (
+                <p
+                  role="status"
+                  className="text-xs text-tertiary bg-tertiary-container/40 border border-tertiary/30 rounded px-3 py-2 flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  Handle updated.
+                </p>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <button
+                  type="submit"
+                  disabled={savingHandle || !handleCanSave}
+                  className="bg-primary text-on-primary px-6 py-3 rounded text-xs font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:active:scale-100"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingHandle ? 'Saving…' : 'Save Handle'}
                 </button>
               </div>
             </form>

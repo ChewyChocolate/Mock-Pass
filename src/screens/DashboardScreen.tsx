@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { BaseScreenProps, ExamLevel, LEVEL_LABELS } from '../types';
 import MainLayout from '../components/MainLayout';
 import { KpiCard } from '../components/KpiCard';
+import LeaderboardWidget from '../components/LeaderboardWidget';
 import RecentSessionList from '../components/RecentSessionList';
 import {
   TrendingUp,
@@ -354,6 +355,12 @@ export default function DashboardScreen({ onNavigate }: BaseScreenProps) {
             emptyMessage="No exam history yet."
           />
         </section>
+
+        {hasHistory && (
+          <div className="mt-12">
+            <LeaderboardWidget onNavigate={onNavigate} />
+          </div>
+        )}
       </div>
     </MainLayout>
   );

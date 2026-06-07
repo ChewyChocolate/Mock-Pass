@@ -12,6 +12,9 @@ section scoring, persistent local history, and a topic-by-topic breakdown.
 
 - **Auth + cross-device sync** — sign in with email + password; completed exam
   sessions sync to Supabase so you can resume across devices.
+- **Public leaderboard** — All-Time, This Week, and Per-Topic boards (Verbal,
+  Analytical, Numerical, General). Each user gets a unique public handle and
+  a privacy-preserving name subtitle (e.g. `chewy_choc` over `MA...A D`).
 - **150-item timed mock** with weighted section scoring (Verbal 30%, Analytical
   35%, Numerical 30%, General Info 5%).
 - **Topic-by-topic breakdown** of strengths and weaknesses.
@@ -99,6 +102,9 @@ maps. No manual env-var management required.
 ## Project Layout
 
 - `supabase/schema.sql` — `exam_sessions` table + RLS policies.
+- `supabase/leaderboard.sql` — `profiles` table + `leaderboard_best`,
+  `leaderboard_week`, `leaderboard_topic` views + `is_handle_available` RPC.
+  Run this **after** `schema.sql` in the Supabase SQL editor.
 - `src/lib/supabase.ts` — browser client + env validation.
 - `src/lib/sync.ts` — `fetchRemoteHistory`, `pushSession`, row↔summary mappers.
 - `src/context/AuthContext.tsx` — Supabase Auth state, `useAuth()` hook.
@@ -108,7 +114,12 @@ maps. No manual env-var management required.
   `buildTopicStats`, and the weighted-section table.
 - `src/screens/` — `LoginScreen`, `DashboardScreen`, `ExamScreen`,
   `ReviewScreen`, `PerformanceScreen`, `SupportScreen`, `ProfileScreen`,
-  `ResetPasswordScreen`.
+  `ResetPasswordScreen`, `LeaderboardScreen`.
+- `src/lib/handle.ts` — `validateHandle`, `buildHandleBaseFromEmail`,
+  `formatNameSubtitle`, reserved-handle set.
+- `src/lib/leaderboard.ts` — Supabase query helpers + `toFiniteScore` +
+  `findUserRank`.
+- `src/hooks/useLeaderboard.ts` — fetches entries for a given tab/level/topic.
 - `tests/e2e/sync.spec.ts` — Playwright E2E test: signs up → runs a
   complete exam (via the dev-only `window.mockpass.autoFillCorrect`
   helper) → submits → waits for Supabase sync → signs out → signs

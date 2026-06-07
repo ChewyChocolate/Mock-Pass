@@ -22,4 +22,8 @@ export const LIMITS = {
   recentActivityRows: 5,
   /** Number of nav items rendered in the top mobile bar. */
   topNavCount: 2,
+  /** Rows rendered on each leaderboard tab. */
+  leaderboardLimit: 100,
+  /** Rows rendered in the dashboard's "Top 3 this week" mini-leaderboard. */
+  leaderboardWidgetRows: 3,
 } as const;

@@ -1,4 +1,12 @@
-export type Screen = 'login' | 'dashboard' | 'review' | 'exam' | 'performance' | 'support' | 'profile';
+export type Screen =
+  | 'login'
+  | 'dashboard'
+  | 'review'
+  | 'exam'
+  | 'performance'
+  | 'support'
+  | 'profile'
+  | 'leaderboard';
 
 export interface BaseScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -70,4 +78,39 @@ export interface ExamSessionSummary {
   score: number;
   timeSpentSeconds: number;
   topicStats: Record<string, TopicStat>;
+}
+
+export type LeaderboardTab = 'all-time' | 'week' | 'topic';
+
+export type QuestionTopicId =
+  | 'Verbal Ability'
+  | 'Analytical Reasoning'
+  | 'Numerical Ability'
+  | 'General Information';
+
+export const PROFESSIONAL_TOPIC_IDS: QuestionTopicId[] = [
+  'Verbal Ability',
+  'Analytical Reasoning',
+  'Numerical Ability',
+  'General Information',
+];
+
+export interface LeaderboardEntry {
+  user_id: string;
+  handle: string;
+  subtitle: string | null;
+  level: ExamLevel;
+  best_score: number | string;
+  best_submitted_at: number;
+  attempts?: number;
+}
+
+export interface LeaderboardTopicEntry {
+  user_id: string;
+  handle: string;
+  subtitle: string | null;
+  level: ExamLevel;
+  topic: string;
+  best_topic_pct: number | string;
+  best_submitted_at: number;
 }
