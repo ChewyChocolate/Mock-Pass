@@ -88,7 +88,11 @@ maps. No manual env-var management required.
 - `npm run dev` — start the Vite dev server.
 - `npm run build` — produce a production build in `dist/`.
 - `npm run preview` — preview the production build locally.
-- `npm test` / `npm run test:watch` — run the Vitest suite.
+- `npm test` / `npm run test:watch` — run the Vitest suite (932 tests; excludes `tests/e2e/**`).
+- `npm run test:e2e` — run the Playwright end-to-end suite (`tests/e2e/sync.spec.ts`).
+  Requires `npx playwright install chromium` (one-time) and a reachable
+  Supabase project (the test signs up a real user at `e2e-<timestamp>@mockpass.test`).
+- `npm run test:e2e:ui` — open the Playwright UI mode for debugging.
 - `npm run lint` — type-check the project with `tsc --noEmit`.
 - `npm run clean` — delete the `dist/` folder and the legacy `server.js`.
 
@@ -103,7 +107,12 @@ maps. No manual env-var management required.
 - `src/data/questions.ts` — `calculateScore`, `migrateSessionScore`,
   `buildTopicStats`, and the weighted-section table.
 - `src/screens/` — `LoginScreen`, `DashboardScreen`, `ExamScreen`,
-  `ReviewScreen`, `PerformanceScreen`, `SupportScreen`.
+  `ReviewScreen`, `PerformanceScreen`, `SupportScreen`, `ProfileScreen`,
+  `ResetPasswordScreen`.
+- `tests/e2e/sync.spec.ts` — Playwright E2E test: signs up → runs a
+  complete exam (via the dev-only `window.mockpass.autoFillCorrect`
+  helper) → submits → waits for Supabase sync → signs out → signs
+  back in → confirms the session re-hydrates from remote.
 
 ## Data + privacy notes
 
