@@ -71,6 +71,12 @@ create table if not exists public.exam_seasons (
 create unique index if not exists exam_seasons_exam_date_key
   on public.exam_seasons (exam_date);
 
+-- Soft-disable column. A season with is_active=false is hidden from the
+-- public current_season view (and therefore from the leaderboard), but kept
+-- in the table for history. Admins can re-enable later.
+alter table public.exam_seasons
+  add column if not exists is_active boolean not null default true;
+
 alter table public.exam_seasons enable row level security;
 
 drop policy if exists "seasons are public" on public.exam_seasons;
@@ -92,16 +98,68 @@ values (
 on conflict (exam_date) do nothing;
 
 -- 4. View: the currently active season (the row whose [starts_at, ends_at]
--- window contains now()). Used by both the UI header and the leaderboard
--- views to filter sessions.
+-- window contains now() AND is_active=true). Used by both the UI header and
+-- the leaderboard views to filter sessions.
 create or replace view public.current_season as
 select id, label, exam_date, starts_at, ends_at
 from public.exam_seasons
-where now() between starts_at and ends_at
+where is_active = true
+  and now() between starts_at and ends_at
 order by starts_at desc
 limit 1;
 
 grant select on public.current_season to anon, authenticated;
+
+-- 4b. Admin RPC: check if the signed-in user is in the admin allowlist.
+-- Mirrors the constant in src/lib/admin.ts. Keep both in sync.
+-- SECURITY DEFINER so the RLS policies can call it without exposing the list.
+create or replace function public.is_admin_email()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select lower(coalesce(auth.jwt() ->> 'email', '')) in (
+    'admin@mockpass.app'
+  );
+$$;
+
+grant execute on function public.is_admin_email() to authenticated;
+
+-- 4c. RLS on exam_seasons: everyone can read active seasons (current_season
+-- already filters by is_active), admins can read everything; only admins
+-- can write.
+drop policy if exists "seasons are public" on public.exam_seasons;
+
+create policy "active seasons are public"
+  on public.exam_seasons for select
+  using (is_active = true or public.is_admin_email());
+
+create policy "admins can insert seasons"
+  on public.exam_seasons for insert
+  to authenticated
+  with check (public.is_admin_email());
+
+create policy "admins can update seasons"
+  on public.exam_seasons for update
+  to authenticated
+  using (public.is_admin_email())
+  with check (public.is_admin_email());
+
+create policy "admins can delete seasons"
+  on public.exam_seasons for delete
+  to authenticated
+  using (public.is_admin_email());
+
+-- 4d. Admin view: ALL seasons, newest first. RLS on the underlying table
+-- still applies; only admins will get rows back.
+create or replace view public.admin_seasons as
+select id, label, exam_date, starts_at, ends_at, is_active
+from public.exam_seasons
+order by starts_at desc;
+
+grant select on public.admin_seasons to authenticated;
 
 -- 5. Helper: build the subtitle string. Inlined in each view to keep the
 -- SQL portable and the views self-contained.

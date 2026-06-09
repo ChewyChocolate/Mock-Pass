@@ -312,6 +312,13 @@ export function ExamProvider({ children }: { children: ReactNode }) {
 
   // ── Backend sync: discard local history on first sign-in, then fetch remote.
   const lastSyncedUserId = useRef<string | null>(null);
+  // Tracks the latest history length so the async sync can detect that
+  // the user submitted on this device while we were fetching remote.
+  const historyLengthRef = useRef(0);
+  useEffect(() => {
+    historyLengthRef.current = state.history.length;
+  }, [state.history]);
+
   useEffect(() => {
     if (!authConfigured || !isSupabaseConfigured()) return;
     if (!isSignedIn || !user) {
@@ -325,15 +332,24 @@ export function ExamProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const client = getSupabaseClient();
-        // First sign-in: drop the local cache so remote becomes the only source of truth.
+        // First sign-in on a fresh device: drop the local cache so remote
+        // becomes the only source of truth.
         dispatch({ type: 'DISCARD_HISTORY' });
         const result = await fetchRemoteHistory(client, user.id);
         if (cancelled) return;
-        if (result.ok) {
-          dispatch({ type: 'HYDRATE_HISTORY', history: result.history });
-        } else {
+        if (!result.ok) {
           console.warn('[mockpass] fetchRemoteHistory failed:', result.error);
+          return;
         }
+        // Race guard: if the user submitted on THIS device while we were
+        // fetching (historyLengthRef > 0 means SUBMIT landed after our
+        // DISCARD_HISTORY), do NOT clobber the just-submitted session with
+        // an empty remote. The push-to-backend useEffect will keep remote
+        // in sync, and the next sign-in will see the session.
+        if (historyLengthRef.current > 0 && result.history.length === 0) {
+          return;
+        }
+        dispatch({ type: 'HYDRATE_HISTORY', history: result.history });
       } catch (err) {
         console.warn('[mockpass] sync init failed:', err);
       }

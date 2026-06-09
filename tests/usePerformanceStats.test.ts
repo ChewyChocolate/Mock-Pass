@@ -4,7 +4,12 @@ import { computePerformanceStats } from '../src/hooks/usePerformanceStats';
 import { PASSING_SCORE } from '../src/data/questions';
 
 const DAY = 24 * 60 * 60 * 1000;
-const TODAY = new Date('2026-06-06T12:00:00Z').getTime();
+// Pin TODAY to the start of the current UTC day so the streak tests are
+// stable across runs regardless of when the suite is executed.
+const TODAY = (() => {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12, 0, 0);
+})();
 
 function makeSession(
   id: string,

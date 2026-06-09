@@ -13,6 +13,7 @@ import SupportScreen from './screens/SupportScreen';
 import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import LeaderboardScreen from './screens/LeaderboardScreen';
+import AdminSeasonsScreen from './screens/AdminSeasonsScreen';
 import './index.css';
 
 function Router() {
@@ -62,6 +63,7 @@ function Router() {
   if (currentScreen === 'support') return <SupportScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'profile') return <ProfileScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'leaderboard') return <LeaderboardScreen onNavigate={handleNavigate} />;
+  if (currentScreen === 'admin') return <AdminSeasonsScreen onNavigate={handleNavigate} />;
   return <ExamScreen onNavigate={handleNavigate} />;
 }
 

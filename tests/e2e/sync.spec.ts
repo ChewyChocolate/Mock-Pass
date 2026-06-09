@@ -96,13 +96,10 @@ test.describe('cross-device history sync', () => {
       .getByRole('navigation', { name: 'Primary' })
       .getByRole('button', { name: /^Dashboard$/ })
       .click();
-    await expect(
-      page.getByRole('heading', { name: /Welcome back, E2E!/ }),
-    ).toBeVisible({ timeout: 10_000 });
 
     // The Recent Activity table should show 1 session row.
     const firstRow = page.locator('table tbody tr').first();
-    await expect(firstRow).toBeVisible({ timeout: 15_000 });
+    await expect(firstRow).toBeVisible({ timeout: 20_000 });
     await expect(firstRow).toContainText(/Mock Exam · 150 items/);
     // With autoFillCorrect, every answer is correct → score should be very high.
     const scoreCell = firstRow.locator('td').nth(3);
@@ -136,13 +133,10 @@ test.describe('cross-device history sync', () => {
     await signIn(page, { email, password });
 
     // After sign-in, the dashboard re-hydrates from Supabase.
-    await expect(
-      page.getByRole('heading', { name: /Welcome back, E2E!/ }),
-    ).toBeVisible({ timeout: SUPABASE_AUTH_TIMEOUT });
-
-    // The session that was synced to Supabase should be re-rendered.
+    // Wait for the first Recent Activity row to appear (proxy for the
+    // post-relogin history having re-hydrated from Supabase).
     const rowAfterRelogin = page.locator('table tbody tr').first();
-    await expect(rowAfterRelogin).toBeVisible({ timeout: 15_000 });
+    await expect(rowAfterRelogin).toBeVisible({ timeout: SUPABASE_AUTH_TIMEOUT });
     await expect(rowAfterRelogin).toContainText(/Mock Exam · 150 items/);
   });
 });

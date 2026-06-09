@@ -22,6 +22,7 @@ import {
   validateHandle,
   withNumericSuffix,
 } from '../lib/handle';
+import { isAdminEmail } from '../lib/admin';
 
 export type AuthStatus = 'unconfigured' | 'loading' | 'signed-out' | 'signed-in';
 
@@ -38,6 +39,7 @@ export interface AuthContextValue extends AuthState {
   isConfigured: boolean;
   isLoading: boolean;
   isSignedIn: boolean;
+  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, profile?: UserProfile) => Promise<void>;
   signOut: () => Promise<void>;
@@ -374,6 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isConfigured: configured,
       isLoading: state.status === 'loading',
       isSignedIn: state.status === 'signed-in',
+      isAdmin: isAdminEmail(state.user?.email),
       signIn,
       signUp,
       signOut,

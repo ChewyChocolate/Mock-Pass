@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BaseScreenProps, Screen } from '../types';
 import React from 'react';
-import { HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check, Trophy } from 'lucide-react';
+import { HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check, Trophy, Shield } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from './Modal';
@@ -32,7 +32,7 @@ const PRO_FEATURES = [
 
 export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: Screen }) {
   const { theme, toggleTheme } = useTheme();
-  const { signOut: authSignOut, user } = useAuth();
+  const { signOut: authSignOut, user, isAdmin } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -301,6 +301,19 @@ export default function MainLayout({ children, onNavigate, currentScreen }: { ch
                           <User className="w-4 h-4" />
                           Profile
                         </button>
+                        {isAdmin && (
+                          <button
+                            role="menuitem"
+                            className="w-full px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-variant flex items-center gap-2"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              onNavigate('admin');
+                            }}
+                          >
+                            <Shield className="w-4 h-4 text-terracotta" />
+                            Admin Console
+                          </button>
+                        )}
                         <button
                           role="menuitem"
                           onClick={handleSignOut}

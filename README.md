@@ -109,9 +109,11 @@ maps. No manual env-var management required.
 - `supabase/schema.sql` — `exam_sessions` table + RLS policies.
 - `supabase/leaderboard.sql` — `profiles` table + `exam_seasons` table +
   `current_season` view + `leaderboard_season` / `leaderboard_season_week` /
-  `leaderboard_season_topic` views + `is_handle_available` RPC. Run this
-  **after** `schema.sql` in the Supabase SQL editor. Add a new
-  `exam_seasons` row for each upcoming CSE; the active board auto-switches.
+  `leaderboard_season_topic` views + `is_handle_available` RPC +
+  `is_admin_email` function + RLS policies. Run this **after** `schema.sql`
+  in the Supabase SQL editor. Add a new `exam_seasons` row for each upcoming
+  CSE; the active board auto-switches. Update the email in the
+  `is_admin_email` function to match your admin allowlist.
 - `src/lib/supabase.ts` — browser client + env validation.
 - `src/lib/sync.ts` — `fetchRemoteHistory`, `pushSession`, row↔summary mappers.
 - `src/context/AuthContext.tsx` — Supabase Auth state, `useAuth()` hook.
@@ -121,16 +123,39 @@ maps. No manual env-var management required.
   `buildTopicStats`, and the weighted-section table.
 - `src/screens/` — `LoginScreen`, `DashboardScreen`, `ExamScreen`,
   `ReviewScreen`, `PerformanceScreen`, `SupportScreen`, `ProfileScreen`,
-  `ResetPasswordScreen`, `LeaderboardScreen`.
+  `ResetPasswordScreen`, `LeaderboardScreen`, `AdminSeasonsScreen`.
+- `src/components/AdminLayout.tsx` + `src/components/AdminSidebar.tsx` —
+  the admin shell. Sign in as an admin email and use the user menu's
+  "Admin Console" item to access it.
 - `src/lib/handle.ts` — `validateHandle`, `buildHandleBaseFromEmail`,
   `formatNameSubtitle`, reserved-handle set.
 - `src/lib/leaderboard.ts` — Supabase query helpers + `toFiniteScore` +
-  `findUserRank`.
+  `findUserRank` + `formatSeasonCountdown`.
 - `src/hooks/useLeaderboard.ts` — fetches entries for a given tab/level/topic.
+- `src/lib/admin.ts` — admin email allowlist + `useAdmin()` hook.
+- `src/hooks/useExamSeasons.ts` — admin CRUD over `exam_seasons`.
+- `src/lib/seasonValidation.ts` — form validation + `defaultSeasonValues`.
 - `tests/e2e/sync.spec.ts` — Playwright E2E test: signs up → runs a
   complete exam (via the dev-only `window.mockpass.autoFillCorrect`
   helper) → submits → waits for Supabase sync → signs out → signs
   back in → confirms the session re-hydrates from remote.
+
+## Admin Console
+
+The admin area lives behind a small email allowlist (set in two places
+that must stay in sync — see the comment at the top of `src/lib/admin.ts`):
+
+1. **`src/lib/admin.ts`** — `ALLOWED_ADMIN_EMAILS` (drives the client-side
+   `useAdmin()` hook and the "Admin Console" item in the user menu).
+2. **`supabase/leaderboard.sql`** — the `is_admin_email()` function
+   (drives the RLS policies on `exam_seasons`).
+
+When a user whose email is in the allowlist signs in, a new "Admin
+Console" item appears in the user menu. v1 ships with a single section
+("Exam Seasons") that lets you add / edit / disable / delete the rows
+in the `exam_seasons` table. Each action is gated by RLS — non-admins
+get a "You don't have access to this area" empty state if they try to
+navigate to `/admin` directly.
 
 ## Data + privacy notes
 

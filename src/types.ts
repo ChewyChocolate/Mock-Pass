@@ -6,7 +6,8 @@ export type Screen =
   | 'performance'
   | 'support'
   | 'profile'
-  | 'leaderboard';
+  | 'leaderboard'
+  | 'admin';
 
 export interface BaseScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -121,4 +122,12 @@ export interface ExamSeason {
   exam_date: string;
   starts_at: string;
   ends_at: string;
+  is_active?: boolean;
+}
+
+export interface SeasonFormValues {
+  label: string;
+  examDate: string;
+  startsAt: string;
+  endsAt: string;
 }
