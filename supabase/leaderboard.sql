@@ -79,11 +79,33 @@ alter table public.exam_seasons
 
 alter table public.exam_seasons enable row level security;
 
-drop policy if exists "seasons are public" on public.exam_seasons;
+-- Idempotency: drop the v2 policies (and any old v1 "seasons are public"
+-- policy that may exist from a previous run) before recreating.
+drop policy if exists "seasons are public"        on public.exam_seasons;
+drop policy if exists "active seasons are public" on public.exam_seasons;
+drop policy if exists "admins can insert seasons" on public.exam_seasons;
+drop policy if exists "admins can update seasons" on public.exam_seasons;
+drop policy if exists "admins can delete seasons" on public.exam_seasons;
 
-create policy "seasons are public"
+create policy "active seasons are public"
   on public.exam_seasons for select
-  using (true);
+  using (is_active = true or public.is_admin_email());
+
+create policy "admins can insert seasons"
+  on public.exam_seasons for insert
+  to authenticated
+  with check (public.is_admin_email());
+
+create policy "admins can update seasons"
+  on public.exam_seasons for update
+  to authenticated
+  using (public.is_admin_email())
+  with check (public.is_admin_email());
+
+create policy "admins can delete seasons"
+  on public.exam_seasons for delete
+  to authenticated
+  using (public.is_admin_email());
 
 -- Seed: one active season. The "next" CSC exam is assumed to be Aug 15, 2026;
 -- the season window is 60 days before -> 1 day after. Update this row (or
@@ -121,36 +143,11 @@ security definer
 set search_path = public
 as $$
   select lower(coalesce(auth.jwt() ->> 'email', '')) in (
-    'deguzmanchristianearl@gmail.com'
+    'deguzmanchristianearl1@gmail.com'
   );
 $$;
 
 grant execute on function public.is_admin_email() to authenticated;
-
--- 4c. RLS on exam_seasons: everyone can read active seasons (current_season
--- already filters by is_active), admins can read everything; only admins
--- can write.
-drop policy if exists "seasons are public" on public.exam_seasons;
-
-create policy "active seasons are public"
-  on public.exam_seasons for select
-  using (is_active = true or public.is_admin_email());
-
-create policy "admins can insert seasons"
-  on public.exam_seasons for insert
-  to authenticated
-  with check (public.is_admin_email());
-
-create policy "admins can update seasons"
-  on public.exam_seasons for update
-  to authenticated
-  using (public.is_admin_email())
-  with check (public.is_admin_email());
-
-create policy "admins can delete seasons"
-  on public.exam_seasons for delete
-  to authenticated
-  using (public.is_admin_email());
 
 -- 4d. Admin view: ALL seasons, newest first. RLS on the underlying table
 -- still applies; only admins will get rows back.
