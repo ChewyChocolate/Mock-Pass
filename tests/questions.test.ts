@@ -42,14 +42,14 @@ function makeChainable(result: { data: unknown; error: unknown }) {
   return chain;
 }
 
-function makeSampleRow(overrides: Partial<{ id: string; level: string }> = {}) {
+function makeSampleRow(overrides: Partial<{ id: string; level: 'professional' | 'sub-professional' }> = {}) {
   return {
     id: overrides.id ?? 'q-test-1',
     level: overrides.level ?? 'professional',
     topic: 'Verbal Ability',
     prompt: 'What is the largest island in the Philippines?',
     options: { A: 'Luzon', B: 'Mindanao', C: 'Palawan', D: 'Visayas' },
-    correct_option_id: 'A',
+    correct_option_id: 'A' as const,
     explanation: 'Luzon is the largest island.',
     is_active: true,
   };

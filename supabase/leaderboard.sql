@@ -444,8 +444,9 @@ begin
   from public.exam_seasons;
 
   -- Sessions per day for the last 30 days. Use generate_series for a
-  -- complete series, then left join to fill in zero-count days.
-  select coalesce(jsonb_agg(row_to_json(d), '[]'::jsonb) order by d.day) into v_session_recent
+  -- complete series, then left join to fill in zero-count days. Order
+  -- the inner subquery; jsonb_agg() doesn't take an ORDER BY.
+  select coalesce(jsonb_agg(row_to_json(d)), '[]'::jsonb) into v_session_recent
   from (
     select to_char(d, 'YYYY-MM-DD') as day,
            coalesce(c.cnt, 0)::int as count
@@ -461,11 +462,13 @@ begin
       where submitted_at >= (extract(epoch from (current_date - interval '29 days')) * 1000)::bigint
       group by 1
     ) c on c.day = d
+    order by d
   ) d;
 
   -- Per-topic difficulty: average score per topic across all sessions.
-  -- topic_stats is jsonb, so we expand it with jsonb_each_text.
-  select coalesce(jsonb_agg(row_to_json(t) order by t.avg_score asc), '[]'::jsonb) into v_topic_difficulty
+  -- topic_stats is jsonb, so we expand it with jsonb_each_text. Order
+  -- the inner subquery; jsonb_agg() doesn't take an ORDER BY.
+  select coalesce(jsonb_agg(row_to_json(t)), '[]'::jsonb) into v_topic_difficulty
   from (
     select
       t.topic,
@@ -475,6 +478,7 @@ begin
     cross join lateral jsonb_each(es.topic_stats) as t(topic, value)
     where (t.value->>'total')::int > 0
     group by t.topic
+    order by avg_score asc
   ) t;
 
   return jsonb_build_object(
