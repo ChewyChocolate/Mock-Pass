@@ -506,3 +506,74 @@ end;
 $$;
 
 grant execute on function public.admin_stats() to authenticated;
+
+-- 12. Support tickets.
+-- Users can create tickets and read their own. Admins can read all
+-- tickets and update the status + add an admin_note.
+create table if not exists public.support_tickets (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  subject     text not null check (length(subject) between 3 and 200),
+  message     text not null check (length(message) between 1 and 5000),
+  status      text not null default 'open'
+              check (status in ('open', 'closed', 'archived')),
+  admin_note  text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists support_tickets_user_id_idx
+  on public.support_tickets (user_id, created_at desc);
+
+create index if not exists support_tickets_status_idx
+  on public.support_tickets (status, created_at desc);
+
+alter table public.support_tickets enable row level security;
+
+drop policy if exists "users read own tickets"       on public.support_tickets;
+drop policy if exists "users insert own tickets"     on public.support_tickets;
+drop policy if exists "admins read all tickets"      on public.support_tickets;
+drop policy if exists "admins update tickets"       on public.support_tickets;
+drop policy if exists "admins delete tickets"       on public.support_tickets;
+
+create policy "users read own tickets"
+  on public.support_tickets for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+create policy "users insert own tickets"
+  on public.support_tickets for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+create policy "admins read all tickets"
+  on public.support_tickets for select
+  to authenticated
+  using (public.is_admin_email());
+
+create policy "admins update tickets"
+  on public.support_tickets for update
+  to authenticated
+  using (public.is_admin_email())
+  with check (public.is_admin_email());
+
+create policy "admins delete tickets"
+  on public.support_tickets for delete
+  to authenticated
+  using (public.is_admin_email());
+
+-- Trigger: keep updated_at fresh.
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists support_tickets_touch_updated_at on public.support_tickets;
+create trigger support_tickets_touch_updated_at
+  before update on public.support_tickets
+  for each row execute function public.touch_updated_at();

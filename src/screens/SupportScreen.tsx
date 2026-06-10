@@ -13,6 +13,10 @@ import {
   Send,
 } from 'lucide-react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useMyTickets, useSubmitTicket } from '../hooks/useSupportTickets';
+import { useAuth } from '../context/AuthContext';
+import { formatDate } from '../utils/format';
+import type { SupportTicket } from '../types';
 
 interface FaqItem {
   q: string;
@@ -46,32 +50,59 @@ const FAQS: FaqItem[] = [
   },
 ];
 
+const STATUS_PILL: Record<
+  SupportTicket['status'],
+  { label: string; classes: string }
+> = {
+  open: {
+    label: 'Open',
+    classes: 'border-terracotta/40 text-terracotta bg-terracotta-container/30',
+  },
+  closed: {
+    label: 'Closed',
+    classes: 'border-on-surface-variant/40 text-on-surface-variant bg-surface-container/40',
+  },
+  archived: {
+    label: 'Archived',
+    classes: 'border-outline-variant/40 text-on-surface-variant/70 bg-surface-container/20',
+  },
+};
+
 export default function SupportScreen({ onNavigate }: BaseScreenProps) {
   const [openFaq, setOpenFaq] = useState<Record<number, boolean>>({ 0: true });
+  const [form, setForm] = useState({ subject: '', message: '' });
+  const [errors, setErrors] = useState<{ subject?: string; message?: string }>({});
   const [sent, setSent] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; email?: string; message?: string }>({});
-  const [form, setForm] = useState({ name: '', email: '', message: '' });
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { tickets, refresh: refreshTickets } = useMyTickets(user?.id ?? null);
+  const { submit, busy } = useSubmitTicket();
 
   const formRef = useFocusTrap<HTMLFormElement>(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = {
-      name: form.name.trim(),
-      email: form.email.trim(),
+      subject: form.subject.trim(),
       message: form.message.trim(),
     };
     const next: typeof errors = {};
-    if (trimmed.name.length < 2) next.name = 'Please enter your name.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed.email)) next.email = 'Please enter a valid email address.';
-    if (trimmed.message.length < 10) next.message = 'Message should be at least 10 characters.';
+    if (trimmed.subject.length < 3) next.subject = 'Subject must be at least 3 characters.';
+    if (trimmed.message.length < 10) next.message = 'Message must be at least 10 characters.';
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
     }
     setErrors({});
+    setSubmitError(null);
+    const result = await submit(trimmed);
+    if (!result.ok) {
+      setSubmitError(result.error ?? 'Failed to send the ticket.');
+      return;
+    }
     setSent(true);
-    setForm({ name: '', email: '', message: '' });
+    setForm({ subject: '', message: '' });
+    refreshTickets();
     window.setTimeout(() => setSent(false), 4000);
   };
 
@@ -151,7 +182,8 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
           <SectionCard className="lg:col-span-5">
             <SectionHeader
               icon={<Send className="w-5 h-5 text-primary" />}
-              title="Send us a message"
+              title="Send us a ticket"
+              subtitle="Signed in as you. We'll reply to your account."
             />
 
             {sent ? (
@@ -161,9 +193,9 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
               >
                 <CheckCircle2 className="w-6 h-6 text-tertiary shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold text-on-surface mb-1">Message sent</p>
+                  <p className="font-bold text-on-surface mb-1">Ticket sent</p>
                   <p className="text-sm text-on-surface-variant">
-                    Thanks for reaching out. We&apos;ll get back to you within 24 hours.
+                    Thanks for reaching out. We&apos;ll respond as soon as we can.
                   </p>
                 </div>
               </div>
@@ -171,60 +203,31 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
               <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate>
                 <div>
                   <label
-                    htmlFor="support-name"
+                    htmlFor="support-subject"
                     className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase"
                   >
-                    Name
+                    Subject
                   </label>
                   <input
-                    id="support-name"
-                    value={form.name}
+                    id="support-subject"
+                    value={form.subject}
                     onChange={(e) => {
-                      setForm({ ...form, name: e.target.value });
-                      if (errors.name) setErrors({ ...errors, name: undefined });
+                      setForm({ ...form, subject: e.target.value });
+                      if (errors.subject) setErrors({ ...errors, subject: undefined });
                     }}
-                    aria-invalid={!!errors.name}
-                    aria-describedby={errors.name ? 'support-name-err' : undefined}
+                    aria-invalid={!!errors.subject}
+                    aria-describedby={errors.subject ? 'support-subject-err' : undefined}
                     className={`w-full mt-1 bg-surface-container-low border rounded px-3 py-2.5 text-on-surface focus:outline-none focus:ring-2 ${
-                      errors.name
+                      errors.subject
                         ? 'border-error focus:ring-error'
                         : 'border-outline-variant focus:ring-primary'
                     }`}
-                    placeholder="Your full name"
+                    placeholder="What's this about?"
+                    maxLength={200}
                   />
-                  {errors.name && (
-                    <p id="support-name-err" className="text-xs text-error mt-1">
-                      {errors.name}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label
-                    htmlFor="support-email"
-                    className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase"
-                  >
-                    Email
-                  </label>
-                  <input
-                    id="support-email"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => {
-                      setForm({ ...form, email: e.target.value });
-                      if (errors.email) setErrors({ ...errors, email: undefined });
-                    }}
-                    aria-invalid={!!errors.email}
-                    aria-describedby={errors.email ? 'support-email-err' : undefined}
-                    className={`w-full mt-1 bg-surface-container-low border rounded px-3 py-2.5 text-on-surface focus:outline-none focus:ring-2 ${
-                      errors.email
-                        ? 'border-error focus:ring-error'
-                        : 'border-outline-variant focus:ring-primary'
-                    }`}
-                    placeholder="you@example.com"
-                  />
-                  {errors.email && (
-                    <p id="support-email-err" className="text-xs text-error mt-1">
-                      {errors.email}
+                  {errors.subject && (
+                    <p id="support-subject-err" className="text-xs text-error mt-1">
+                      {errors.subject}
                     </p>
                   )}
                 </div>
@@ -251,6 +254,7 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
                         : 'border-outline-variant focus:ring-primary'
                     }`}
                     placeholder="How can we help?"
+                    maxLength={5000}
                   />
                   {errors.message && (
                     <p id="support-message-err" className="text-xs text-error mt-1">
@@ -258,17 +262,71 @@ export default function SupportScreen({ onNavigate }: BaseScreenProps) {
                     </p>
                   )}
                 </div>
+                {submitError && (
+                  <p role="alert" className="text-xs text-error">
+                    {submitError}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  className="w-full bg-primary text-on-primary py-3 rounded font-semibold text-sm tracking-widest uppercase hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                  disabled={busy}
+                  className="w-full bg-primary text-on-primary py-3 rounded font-semibold text-sm tracking-widest uppercase hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />
-                  Send Message
+                  {busy ? 'Sending…' : 'Send Ticket'}
                 </button>
               </form>
             )}
           </SectionCard>
         </div>
+
+        {/* My tickets */}
+        {tickets.length > 0 && (
+          <SectionCard>
+            <SectionHeader
+              icon={<MessageSquare className="w-5 h-5 text-primary" />}
+              title="Your tickets"
+              subtitle="Track responses from our team"
+            />
+            <div className="mt-4 space-y-3">
+              {tickets.map((t) => {
+                const pill = STATUS_PILL[t.status];
+                return (
+                  <div
+                    key={t.id}
+                    className="border border-outline-variant/50 rounded p-4 bg-surface-container-low/40"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                      <p className="font-bold text-on-surface">{t.subject}</p>
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border self-start sm:self-auto ${pill.classes}`}
+                      >
+                        {pill.label}
+                      </span>
+                    </div>
+                    <p className="text-sm text-on-surface-variant whitespace-pre-wrap mb-2">
+                      {t.message}
+                    </p>
+                    {t.admin_note && (
+                      <div className="mt-3 p-3 bg-tertiary-container/30 border border-tertiary/40 rounded text-sm">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-tertiary mb-1">
+                          Reply from our team
+                        </p>
+                        <p className="text-on-surface whitespace-pre-wrap">{t.admin_note}</p>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-on-surface-variant mt-2">
+                      Submitted {formatDate(Date.parse(t.created_at))}
+                      {t.updated_at !== t.created_at && (
+                        <> · Updated {formatDate(Date.parse(t.updated_at))}</>
+                      )}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
+        )}
       </div>
     </MainLayout>
   );

@@ -125,6 +125,23 @@ export interface ExamSeason {
   is_active?: boolean;
 }
 
+export type SupportTicketStatus = 'open' | 'closed' | 'archived';
+
+export interface SupportTicket {
+  id: string;
+  user_id: string;
+  subject: string;
+  message: string;
+  status: SupportTicketStatus;
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupportTicketWithEmail extends SupportTicket {
+  user_email: string;
+}
+
 export interface SeasonFormValues {
   label: string;
   examDate: string;
