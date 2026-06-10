@@ -6,7 +6,7 @@ import './index.css';
 
 initSentry();
 
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEVTOOLS === 'true') {
   import('./utils/devTools');
 }
 
