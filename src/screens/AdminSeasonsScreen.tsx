@@ -68,7 +68,19 @@ function initialConfirmState(): ConfirmState {
   };
 }
 
-export default function AdminSeasonsScreen({ onNavigate }: BaseScreenProps) {
+interface AdminSeasonsScreenProps extends BaseScreenProps {
+  /**
+   * Callback when the user clicks a different item in the admin
+   * sidebar. AdminRouter owns the section state; this screen only
+   * renders the Seasons UI.
+   */
+  onSelectSection?: (id: AdminSectionId) => void;
+}
+
+export default function AdminSeasonsScreen({
+  onNavigate,
+  onSelectSection,
+}: AdminSeasonsScreenProps) {
   const isAdmin = useAdmin();
   // Gate the data fetch on isAdmin. A non-admin visiting /admin used to
   // trigger an RLS-denied network call before the access-denied state
@@ -76,9 +88,12 @@ export default function AdminSeasonsScreen({ onNavigate }: BaseScreenProps) {
   const { status, seasons, error, refresh, save, setActive, remove } = useExamSeasons({
     enabled: isAdmin,
   });
-  const [section, setSection] = useState<AdminSectionId>('seasons');
   const [form, setForm] = useState<FormState>(initialFormState());
   const [confirm, setConfirm] = useState<ConfirmState>(initialConfirmState());
+
+  const handleSectionSelect = (id: AdminSectionId) => {
+    if (onSelectSection) onSelectSection(id);
+  };
 
   const grouped = useMemo(() => {
     const now = Date.now();
@@ -228,7 +243,7 @@ export default function AdminSeasonsScreen({ onNavigate }: BaseScreenProps) {
   };
 
   return (
-    <AdminLayout active={section} onSelect={setSection} onNavigate={onNavigate}>
+    <AdminLayout active="seasons" onSelect={handleSectionSelect} onNavigate={onNavigate}>
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 w-full">
         <SectionHeader
           icon={<CalendarRange className="w-5 h-5 text-terracotta" />}

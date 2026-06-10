@@ -355,3 +355,154 @@ as $$
 $$;
 
 grant execute on function public.is_handle_available(text, uuid) to authenticated;
+
+-- 11. RPC: admin stats dashboard.
+-- Returns a single JSON blob with all numbers the admin Stats screen
+-- needs. SECURITY DEFINER + is_admin_email() guard so non-admins get
+-- a permission error instead of leaked data.
+--
+-- Shape:
+--   {
+--     total_users: int,
+--     total_sessions: int,
+--     sessions_this_week: int,
+--     sessions_last_30_days: [{ day: 'YYYY-MM-DD', count: int }, ...],
+--     pass_rate_overall: numeric,         -- % of all sessions with score >= 80
+--     average_score_overall: numeric,
+--     pass_rate_distribution: { '0-49': int, '50-79': int, '80-89': int, '90-100': int },
+--     sessions_by_level: { professional: int, 'sub-professional': int },
+--     topic_difficulty: [{ topic: text, avg_score: numeric, n: int }, ...]
+--     active_seasons: { total: int, active_now: int, upcoming: int, past: int }
+--   }
+create or replace function public.admin_stats()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_caller_email text := lower(coalesce(auth.email(), ''));
+  v_total_users int;
+  v_total_sessions int;
+  v_sessions_this_week int;
+  v_pass_rate_overall numeric;
+  v_average_score_overall numeric;
+  v_dist_0_49 int;
+  v_dist_50_79 int;
+  v_dist_80_89 int;
+  v_dist_90_100 int;
+  v_professional int;
+  v_sub_professional int;
+  v_total_seasons int;
+  v_active_seasons int;
+  v_upcoming_seasons int;
+  v_past_seasons int;
+  v_session_recent jsonb;
+  v_topic_difficulty jsonb;
+begin
+  if not exists (
+    select 1 from public.admin_allowlist where email = v_caller_email
+  ) then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  select count(*) into v_total_users from public.profiles;
+
+  select
+    count(*),
+    count(*) filter (where submitted_at >= (extract(epoch from (now() - interval '7 days')) * 1000)::bigint)
+  into v_total_sessions, v_sessions_this_week
+  from public.exam_sessions;
+
+  select
+    coalesce(round(100.0 * count(*) filter (where score >= 80) / nullif(count(*), 0), 1), 0),
+    coalesce(round(avg(score)::numeric, 1), 0)
+  into v_pass_rate_overall, v_average_score_overall
+  from public.exam_sessions;
+
+  select
+    count(*) filter (where score < 50),
+    count(*) filter (where score >= 50 and score < 80),
+    count(*) filter (where score >= 80 and score < 90),
+    count(*) filter (where score >= 90)
+  into v_dist_0_49, v_dist_50_79, v_dist_80_89, v_dist_90_100
+  from public.exam_sessions;
+
+  select
+    count(*) filter (where level = 'professional'),
+    count(*) filter (where level = 'sub-professional')
+  into v_professional, v_sub_professional
+  from public.exam_sessions;
+
+  select
+    count(*),
+    count(*) filter (where is_active = true and now() between starts_at and ends_at),
+    count(*) filter (where starts_at > now()),
+    count(*) filter (where ends_at < now())
+  into v_total_seasons, v_active_seasons, v_upcoming_seasons, v_past_seasons
+  from public.exam_seasons;
+
+  -- Sessions per day for the last 30 days. Use generate_series for a
+  -- complete series, then left join to fill in zero-count days.
+  select coalesce(jsonb_agg(row_to_json(d), '[]'::jsonb) order by d.day) into v_session_recent
+  from (
+    select to_char(d, 'YYYY-MM-DD') as day,
+           coalesce(c.cnt, 0)::int as count
+    from generate_series(
+      (current_date - interval '29 days')::date,
+      current_date,
+      interval '1 day'
+    ) d
+    left join (
+      select date_trunc('day', to_timestamp(submitted_at / 1000.0)) as day,
+             count(*) as cnt
+      from public.exam_sessions
+      where submitted_at >= (extract(epoch from (current_date - interval '29 days')) * 1000)::bigint
+      group by 1
+    ) c on c.day = d
+  ) d;
+
+  -- Per-topic difficulty: average score per topic across all sessions.
+  -- topic_stats is jsonb, so we expand it with jsonb_each_text.
+  select coalesce(jsonb_agg(row_to_json(t) order by t.avg_score asc), '[]'::jsonb) into v_topic_difficulty
+  from (
+    select
+      t.topic,
+      round(avg((t.value->>'correct')::numeric / nullif((t.value->>'total')::int, 0) * 100)::numeric, 1) as avg_score,
+      count(*)::int as n
+    from public.exam_sessions es
+    cross join lateral jsonb_each(es.topic_stats) as t(topic, value)
+    where (t.value->>'total')::int > 0
+    group by t.topic
+  ) t;
+
+  return jsonb_build_object(
+    'total_users', v_total_users,
+    'total_sessions', v_total_sessions,
+    'sessions_this_week', v_sessions_this_week,
+    'sessions_last_30_days', v_session_recent,
+    'pass_rate_overall', v_pass_rate_overall,
+    'average_score_overall', v_average_score_overall,
+    'pass_rate_distribution', jsonb_build_object(
+      '0-49', v_dist_0_49,
+      '50-79', v_dist_50_79,
+      '80-89', v_dist_80_89,
+      '90-100', v_dist_90_100
+    ),
+    'sessions_by_level', jsonb_build_object(
+      'professional', v_professional,
+      'sub-professional', v_sub_professional
+    ),
+    'topic_difficulty', v_topic_difficulty,
+    'active_seasons', jsonb_build_object(
+      'total', v_total_seasons,
+      'active_now', v_active_seasons,
+      'upcoming', v_upcoming_seasons,
+      'past', v_past_seasons
+    )
+  );
+end;
+$$;
+
+grant execute on function public.admin_stats() to authenticated;

@@ -14,7 +14,27 @@ import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import LeaderboardScreen from './screens/LeaderboardScreen';
 import AdminSeasonsScreen from './screens/AdminSeasonsScreen';
+import AdminStatsScreen from './screens/AdminStatsScreen';
+import { type AdminSectionId } from './components/AdminSidebar';
 import './index.css';
+
+function AdminRouter({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+  const [section, setSection] = useState<AdminSectionId>('seasons');
+  if (section === 'stats') {
+    return (
+      <AdminStatsScreen
+        onNavigate={onNavigate}
+        onSelectSection={setSection}
+      />
+    );
+  }
+  return (
+    <AdminSeasonsScreen
+      onNavigate={onNavigate}
+      onSelectSection={setSection}
+    />
+  );
+}
 
 function Router() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
@@ -63,7 +83,7 @@ function Router() {
   if (currentScreen === 'support') return <SupportScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'profile') return <ProfileScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'leaderboard') return <LeaderboardScreen onNavigate={handleNavigate} />;
-  if (currentScreen === 'admin') return <AdminSeasonsScreen onNavigate={handleNavigate} />;
+  if (currentScreen === 'admin') return <AdminRouter onNavigate={handleNavigate} />;
   return <ExamScreen onNavigate={handleNavigate} />;
 }
 

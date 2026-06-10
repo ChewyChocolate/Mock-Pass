@@ -15,7 +15,7 @@ const ADMIN_NAV: AdminNavItem[] = [
   { id: 'users', label: 'Users', icon: <UserCog className="w-5 h-5" />, available: false },
   { id: 'questions', label: 'Question Bank', icon: <MessageSquare className="w-5 h-5" />, available: false },
   { id: 'support', label: 'Support', icon: <Shield className="w-5 h-5" />, available: false },
-  { id: 'stats', label: 'Stats', icon: <BarChart3 className="w-5 h-5" />, available: false },
+  { id: 'stats', label: 'Stats', icon: <BarChart3 className="w-5 h-5" />, available: true },
 ];
 
 interface AdminSidebarProps {
