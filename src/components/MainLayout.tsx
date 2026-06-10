@@ -4,6 +4,7 @@ import React from 'react';
 import { HelpCircle, LayoutDashboard, FileQuestion, BarChart2, Bell, PenTool, Sun, Moon, Menu, X, LogOut, User, Sparkles, Check, Trophy, Shield } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useAdmin } from '../lib/admin';
 import { Modal } from './Modal';
 import { LIMITS } from '../lib/limits';
 
@@ -32,7 +33,8 @@ const PRO_FEATURES = [
 
 export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: Screen }) {
   const { theme, toggleTheme } = useTheme();
-  const { signOut: authSignOut, user, isAdmin } = useAuth();
+  const { signOut: authSignOut, user } = useAuth();
+  const isAdmin = useAdmin();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);

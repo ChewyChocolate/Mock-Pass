@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, RefreshCw, Pencil, Power, PowerOff, Trash2, CalendarRange, AlertTriangle, ShieldOff } from 'lucide-react';
 import { BaseScreenProps, type ExamSeason, type SeasonFormValues } from '../types';
 import { AdminLayout, type AdminSectionId } from '../components/AdminLayout';
@@ -70,16 +70,15 @@ function initialConfirmState(): ConfirmState {
 
 export default function AdminSeasonsScreen({ onNavigate }: BaseScreenProps) {
   const isAdmin = useAdmin();
-  const { status, seasons, error, refresh, save, setActive, remove } = useExamSeasons();
+  // Gate the data fetch on isAdmin. A non-admin visiting /admin used to
+  // trigger an RLS-denied network call before the access-denied state
+  // rendered; the hook now no-ops when disabled.
+  const { status, seasons, error, refresh, save, setActive, remove } = useExamSeasons({
+    enabled: isAdmin,
+  });
   const [section, setSection] = useState<AdminSectionId>('seasons');
   const [form, setForm] = useState<FormState>(initialFormState());
   const [confirm, setConfirm] = useState<ConfirmState>(initialConfirmState());
-
-  useEffect(() => {
-    if (!isAdmin) {
-      onNavigate('dashboard');
-    }
-  }, [isAdmin, onNavigate]);
 
   const grouped = useMemo(() => {
     const now = Date.now();

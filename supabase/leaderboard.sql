@@ -135,16 +135,45 @@ limit 1;
 
 grant select on public.current_season to anon, authenticated;
 
--- 4b. Admin RPC: check if the signed-in user is in the admin allowlist.
--- Mirrors the constant in src/lib/admin.ts. Keep both in sync.
--- SECURITY DEFINER so the RLS policies can call it without exposing the list.
+-- 4b. Admin allowlist (DB-backed, single source of truth).
+-- Replaces the prior hardcoded email inside is_admin_email() so that
+-- adding/removing admins is a single INSERT/DELETE, not a redeploy.
+create table if not exists public.admin_allowlist (
+  email       text primary key,
+  added_at    timestamptz not null default now(),
+  constraint  admin_allowlist_email_lower check (email = lower(email))
+);
+
+-- Seed the first admin. To add another admin later:
+--   insert into public.admin_allowlist (email) values ('you@example.com');
+-- To remove:
+--   delete from public.admin_allowlist where email = 'you@example.com';
+insert into public.admin_allowlist (email)
+values ('deguzmanchristianearl1@gmail.com')
+on conflict (email) do nothing;
+
+-- RLS on the allowlist: only admins (those already in it) can read it.
+-- This prevents enumeration. Non-admins can't even count rows.
+alter table public.admin_allowlist enable row level security;
+
+drop policy if exists "admins can read allowlist" on public.admin_allowlist;
+create policy "admins can read allowlist"
+  on public.admin_allowlist for select
+  to authenticated
+  using (public.is_admin_email());
+
+-- No INSERT/UPDATE/DELETE policy: writes go through the SQL editor only.
+-- Future: an admin-only "Manage Admins" section could write through an RPC.
+
+-- RLS helper used by all exam_seasons policies. Reads from the table.
+-- SECURITY DEFINER so it works regardless of the caller's RLS on admin_allowlist.
 --
 -- IMPORTANT: We use auth.email() (not auth.jwt() ->> 'email') because
 -- GoTrue's default JWT does NOT include the email claim. auth.email()
 -- reads from auth.users via the JWT's sub and is the Supabase-recommended
 -- way to get the signed-in user's email in RLS policies.
--- Requires: grant usage on schema auth to authenticated; (run once
--- in the Supabase dashboard under Database > Roles > authenticated).
+-- Requires: grant usage on schema auth to authenticated; (above, near
+-- the top of this file).
 create or replace function public.is_admin_email()
 returns boolean
 language sql
@@ -152,12 +181,33 @@ stable
 security definer
 set search_path = public
 as $$
-  select lower(coalesce(auth.email(), '')) in (
-    'deguzmanchristianearl1@gmail.com'
+  select exists (
+    select 1 from public.admin_allowlist
+    where email = lower(coalesce(auth.email(), ''))
   );
 $$;
 
 grant execute on function public.is_admin_email() to authenticated;
+
+-- Client-side check. Returns true iff the given email is in the allowlist.
+-- SECURITY DEFINER so anon can call it without RLS on admin_allowlist.
+-- The client uses this to decide whether to show the "Admin Console" UI
+-- affordance. RLS still gates every write — so a client pretending to be
+-- admin would be denied at the database level regardless.
+create or replace function public.is_email_in_admin_allowlist(email text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.admin_allowlist
+    where admin_allowlist.email = lower(is_email_in_admin_allowlist.email)
+  );
+$$;
+
+grant execute on function public.is_email_in_admin_allowlist(text) to anon, authenticated;
 
 -- 4d. Admin view: ALL seasons, newest first. RLS on the underlying table
 -- still applies; only admins will get rows back.

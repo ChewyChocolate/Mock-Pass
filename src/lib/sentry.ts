@@ -27,7 +27,16 @@ export function initSentry(): void {
     sendDefaultPii: false,
     integrations: [
       Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration(),
+      // Mask all text in replays and block all media. The login screen
+      // captures the user's email + password as they type, and the
+      // review screen shows their exam answers — both are PII. Without
+      // these options, `replaysOnErrorSampleRate: 1.0` would record
+      // them in plaintext to Sentry's servers. `sendDefaultPii: false`
+      // does NOT apply to replays; only `maskAllText` does.
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
     ],
   });
 }

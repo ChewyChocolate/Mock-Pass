@@ -142,13 +142,16 @@ maps. No manual env-var management required.
 
 ## Admin Console
 
-The admin area lives behind a small email allowlist (set in two places
-that must stay in sync — see the comment at the top of `src/lib/admin.ts`):
+The admin area is gated by a single email allowlist that lives in
+Supabase:
 
-1. **`src/lib/admin.ts`** — `ALLOWED_ADMIN_EMAILS` (drives the client-side
-   `useAdmin()` hook and the "Admin Console" item in the user menu).
-2. **`supabase/leaderboard.sql`** — the `is_admin_email()` function
-   (drives the RLS policies on `exam_seasons`).
+- **`public.admin_allowlist`** — the source of truth. Add an admin
+  with `insert into public.admin_allowlist (email) values ('you@example.com');`.
+- The `is_admin_email()` function reads from this table and is used by
+  the RLS policies on `exam_seasons`.
+- The client fetches "am I an admin?" via the
+  `is_email_in_admin_allowlist(email)` RPC (with a 60s localStorage
+  cache, see `src/lib/admin.ts`).
 
 When a user whose email is in the allowlist signs in, a new "Admin
 Console" item appears in the user menu. v1 ships with a single section
@@ -160,10 +163,12 @@ navigate to `/admin` directly.
 ## Known issues
 
 See [`QA_REPORT.md`](./QA_REPORT.md) for a prioritized list of bugs and
-design issues found during the most recent audit. **Top 5 fixes** (P0-2
-admin RLS, P0-1 leaderboard pause, P1-1 sign-in race, P0-3 handle TOCTOU,
-P2-10 sub-pro topic) are scheduled; the rest are documented for future
-batches.
+design issues found during the most recent audit. **Tier 1 fixes** (P1-2
+allowlist table, P1-3 admin redirect race, P1-4 leaderboard index, P0-5
+idempotent migration, P0-6 handle entropy, P2-21 Sentry PII) shipped;
+the remaining P0-1 (leaderboard pause state) and P0-2 (auth.email()) are
+the only ones still on the table; everything else is documented for
+future batches.
 
 ## Data + privacy notes
 

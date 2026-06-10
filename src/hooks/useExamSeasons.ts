@@ -4,6 +4,16 @@ import type { ExamSeason, SeasonFormValues } from '../types';
 
 export type SeasonsStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+export interface UseExamSeasonsOptions {
+  /**
+   * When false, the hook does NOT fetch from Supabase. Use this to gate
+   * admin-only screens: pass `enabled: isAdmin` so a non-admin visiting
+   * `/admin` doesn't fire an RLS-denied network call and trigger an
+   * error toast before the access-denied state can render.
+   */
+  enabled?: boolean;
+}
+
 export interface UseExamSeasonsResult {
   status: SeasonsStatus;
   seasons: ExamSeason[];
@@ -14,7 +24,10 @@ export interface UseExamSeasonsResult {
   remove: (id: string) => Promise<void>;
 }
 
-export function useExamSeasons(): UseExamSeasonsResult {
+export function useExamSeasons(
+  options: UseExamSeasonsOptions = {},
+): UseExamSeasonsResult {
+  const { enabled = true } = options;
   const [status, setStatus] = useState<SeasonsStatus>('idle');
   const [seasons, setSeasons] = useState<ExamSeason[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +38,12 @@ export function useExamSeasons(): UseExamSeasonsResult {
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      // Stay in idle — no data, no error. The screen renders the
+      // access-denied EmptyState from `isAdmin === false`.
+      setStatus('idle');
+      return;
+    }
     let active = true;
     setStatus('loading');
     setError(null);
@@ -52,7 +71,7 @@ export function useExamSeasons(): UseExamSeasonsResult {
     return () => {
       active = false;
     };
-  }, [refreshTick]);
+  }, [refreshTick, enabled]);
 
   const save = useCallback(
     async (values: SeasonFormValues, id?: string) => {

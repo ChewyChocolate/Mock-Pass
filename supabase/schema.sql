@@ -19,6 +19,13 @@ create table if not exists public.exam_sessions (
 create index if not exists exam_sessions_user_submitted_idx
   on public.exam_sessions (user_id, submitted_at desc);
 
+-- Leaderboard views filter by (submitted_at, level) without a user_id
+-- predicate (the join is `cross join current_season s`). Without this
+-- index the views do a full table scan on every page load. 1k users
+-- @ 10 sessions each is fine; 10k users starts to feel slow.
+create index if not exists exam_sessions_submitted_level_idx
+  on public.exam_sessions (submitted_at, level);
+
 alter table public.exam_sessions enable row level security;
 
 -- Drop existing policies if they exist so this script is idempotent.

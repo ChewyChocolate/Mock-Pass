@@ -68,15 +68,30 @@ describe('validateHandle', () => {
     expect(result.error).toMatch(/lowercase|underscore/);
   });
 
-  it('rejects reserved handles', () => {
-    for (const reserved of ['admin', 'support', 'system', 'mockpass', 'moderator']) {
+  it('rejects reserved handles (case-insensitive — every entry)', () => {
+    // Iterate over the actual set so a future PR that adds or removes a
+    // reserved handle can't silently break this test.
+    for (const reserved of RESERVED_HANDLES) {
       const result = validateHandle(reserved);
-      expect(result.ok).toBe(false);
-      expect(result.error).toMatch(/reserved/);
+      expect(result.ok, `expected "${reserved}" to be rejected`).toBe(false);
+      expect(result.error, `expected "${reserved}" error to mention "reserved"`).toMatch(
+        /reserved/,
+      );
+      // Case-insensitive matching.
+      const upperResult = validateHandle(reserved.toUpperCase());
+      expect(upperResult.ok, `expected "${reserved.toUpperCase()}" to be rejected`).toBe(false);
     }
   });
 
+  it('rejects reserved handles with a numeric suffix', () => {
+    // "admin_42" should be allowed (not reserved). Make sure the reserved
+    // check uses exact equality, not a prefix match.
+    expect(validateHandle('admin_42').ok).toBe(true);
+    expect(validateHandle('the_admin').ok).toBe(true);
+  });
+
   it('exposes the reserved handle set so we know what is blocked', () => {
+    expect(RESERVED_HANDLES.size).toBeGreaterThan(0);
     expect(RESERVED_HANDLES.has('admin')).toBe(true);
     expect(RESERVED_HANDLES.has('root')).toBe(true);
     expect(RESERVED_HANDLES.has('chewy')).toBe(false);

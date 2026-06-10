@@ -104,15 +104,26 @@ export function calculateScore(
 }
 
 /**
- * Defensive migration for persisted session scores. Two cases are handled:
- *   1. Legacy scores from the pre-fix ×100 bug (e.g. 3881) are corrected by
- *      dividing by 100, so a real 38.81% reads back as 39.
- *   2. Any non-finite or negative value collapses to 0.
- * Scores already in [0, 100] are returned unchanged.
+ * Defensive migration for persisted session scores.
+ *
+ *   - Pre-fix ×100 bug: a real 38.81% was stored as 3881. The DB CHECK
+ *     constraint is `score <= 100`, so anything above 100 is either a
+ *     pre-fix row or corrupt data. We divide by 100 ONLY for values
+ *     clearly above the valid range (the old `> 100` rule would
+ *     incorrectly re-divide a real 100.0001 from a rounding edge).
+ *     The threshold `> 1000` is impossible per the CHECK and is the
+ *     unambiguous signature of the pre-fix bug.
+ *   - Non-finite / negative values collapse to 0.
+ *   - Scores already in [0, 100] pass through clamped to the range.
+ *
+ * The function is idempotent: a real 39 from a migrated 3881 re-runs as
+ * 39 (no second divide).
  */
+const MIGRATION_THRESHOLD = 1000;
+
 export function migrateSessionScore(score: number): number {
   if (!Number.isFinite(score)) return 0;
-  if (score > 100) return Math.round(score / 100);
+  if (score > MIGRATION_THRESHOLD) return Math.round(score / 100);
   return Math.max(0, Math.min(100, score));
 }
 

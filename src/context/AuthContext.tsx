@@ -22,7 +22,6 @@ import {
   validateHandle,
   withNumericSuffix,
 } from '../lib/handle';
-import { isAdminEmail } from '../lib/admin';
 
 export type AuthStatus = 'unconfigured' | 'loading' | 'signed-out' | 'signed-in';
 
@@ -39,7 +38,6 @@ export interface AuthContextValue extends AuthState {
   isConfigured: boolean;
   isLoading: boolean;
   isSignedIn: boolean;
-  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, profile?: UserProfile) => Promise<void>;
   signOut: () => Promise<void>;
@@ -125,7 +123,19 @@ async function ensureProfileRow(
 ): Promise<string> {
   const base = buildHandleBaseFromEmail(email);
   for (let attempt = 0; attempt < 6; attempt++) {
-    const handle = withNumericSuffix(base, (Date.now() + attempt * 997) % 100000);
+    // crypto.getRandomValues gives unpredictable entropy that doesn't
+    // collide for users signing up in the same millisecond (or for
+    // repeat retries). Fall back to Math.random if the Web Crypto API
+    // is unavailable (e.g. in a non-secure-context test environment).
+    let rand: number;
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const buf = new Uint32Array(1);
+      crypto.getRandomValues(buf);
+      rand = buf[0]!;
+    } else {
+      rand = Math.floor(Math.random() * 0xffffffff);
+    }
+    const handle = withNumericSuffix(base, rand % 100000);
     const { error } = await client.from('profiles').insert({
       user_id: userId,
       handle,
@@ -379,7 +389,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isConfigured: configured,
       isLoading: state.status === 'loading',
       isSignedIn: state.status === 'signed-in',
-      isAdmin: isAdminEmail(state.user?.email),
       signIn,
       signUp,
       signOut,
