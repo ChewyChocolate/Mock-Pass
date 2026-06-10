@@ -594,7 +594,7 @@ returns table (
   created_at timestamptz,
   sessions_count bigint
 )
-language sql
+language plpgsql
 stable
 security definer
 set search_path = public
@@ -643,7 +643,7 @@ returns table (
   submitted_at bigint,
   time_spent_seconds int
 )
-language sql
+language plpgsql
 stable
 security definer
 set search_path = public
