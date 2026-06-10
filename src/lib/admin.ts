@@ -6,7 +6,7 @@
 import { useAuth } from '../context/AuthContext';
 
 export const ALLOWED_ADMIN_EMAILS: ReadonlySet<string> = new Set([
-  'admin@mockpass.app',
+  'deguzmanchristianearl@gmail.com',
 ]);
 
 export function isAdminEmail(email: string | null | undefined): boolean {

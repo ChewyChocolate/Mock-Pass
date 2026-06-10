@@ -121,7 +121,7 @@ security definer
 set search_path = public
 as $$
   select lower(coalesce(auth.jwt() ->> 'email', '')) in (
-    'admin@mockpass.app'
+    'deguzmanchristianearl@gmail.com'
   );
 $$;
 
