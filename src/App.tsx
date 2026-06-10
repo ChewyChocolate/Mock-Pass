@@ -17,7 +17,9 @@ import AdminSeasonsScreen from './screens/AdminSeasonsScreen';
 import AdminStatsScreen from './screens/AdminStatsScreen';
 import AdminSupportScreen from './screens/AdminSupportScreen';
 import AdminUsersScreen from './screens/AdminUsersScreen';
+import AdminQuestionsScreen from './screens/AdminQuestionsScreen';
 import { type AdminSectionId } from './components/AdminSidebar';
+import { preloadQuestions } from './hooks/useQuestions';
 import './index.css';
 
 function AdminRouter({ onNavigate }: { onNavigate: (s: Screen) => void }) {
@@ -46,6 +48,14 @@ function AdminRouter({ onNavigate }: { onNavigate: (s: Screen) => void }) {
       />
     );
   }
+  if (section === 'questions') {
+    return (
+      <AdminQuestionsScreen
+        onNavigate={onNavigate}
+        onSelectSection={setSection}
+      />
+    );
+  }
   return (
     <AdminSeasonsScreen
       onNavigate={onNavigate}
@@ -61,6 +71,13 @@ function Router() {
   const initialized = useRef(false);
   const prevStatus = useRef(state.status);
   const prevSignedIn = useRef<boolean | null>(null);
+
+  // Preload the question bank from the DB so admin edits are live
+  // without requiring a redeploy. Idempotent; safe to call on every
+  // mount.
+  useEffect(() => {
+    void preloadQuestions();
+  }, []);
 
   useEffect(() => {
     if (initialized.current) return;

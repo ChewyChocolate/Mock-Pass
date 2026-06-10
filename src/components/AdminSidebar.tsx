@@ -13,7 +13,7 @@ interface AdminNavItem {
 const ADMIN_NAV: AdminNavItem[] = [
   { id: 'seasons', label: 'Exam Seasons', icon: <CalendarRange className="w-5 h-5" />, available: true },
   { id: 'users', label: 'Users', icon: <UserCog className="w-5 h-5" />, available: true },
-  { id: 'questions', label: 'Question Bank', icon: <MessageSquare className="w-5 h-5" />, available: false },
+  { id: 'questions', label: 'Question Bank', icon: <MessageSquare className="w-5 h-5" />, available: true },
   { id: 'support', label: 'Support', icon: <Shield className="w-5 h-5" />, available: true },
   { id: 'stats', label: 'Stats', icon: <BarChart3 className="w-5 h-5" />, available: true },
 ];
