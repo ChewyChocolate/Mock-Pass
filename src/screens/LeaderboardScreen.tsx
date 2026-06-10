@@ -54,6 +54,18 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
     if (next === 'professional' && !PROFESSIONAL_TOPIC_IDS.includes(topic as never)) {
       setTopic(PROFESSIONAL_TOPIC_IDS[0]);
     }
+    // If the user is on the "Per Topic" tab but switches to sub-pro, fall
+    // back to the All-Time tab — sub-pro per-topic boards aren't shipped yet.
+    if (next === 'sub-professional' && tab === 'topic') {
+      setTab('all-time');
+    }
+  };
+
+  const handleTabChange = (next: LeaderboardTab) => {
+    setTab(next);
+    // Sub-Pro per-topic is intentionally unavailable; the tab is still
+    // visible so users see the upcoming-feature affordance, but the
+    // empty-state explains why.
   };
 
   return (
@@ -164,7 +176,7 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
             return (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => handleTabChange(t.id)}
                 className={`px-4 py-3 text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 transition-all border-b-2 whitespace-nowrap ${
                   active
                     ? 'border-primary text-primary'
@@ -196,28 +208,42 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
         )}
 
         {status === 'ready' && entries.length === 0 && (
-          <EmptyState
-            icon={<Trophy className="w-12 h-12 text-on-surface-variant opacity-40" />}
-            title="No submissions yet"
-            description={
-              tab === 'week'
-                ? 'Be the first reviewer to land on the weekly board this season.'
-                : tab === 'topic'
-                ? 'No one has submitted an attempt for this topic this season.'
-                : season
-                ? `Be the first to claim the top spot for ${season.label}.`
-                : 'Be the first to claim the top spot.'
-            }
-            titleAs="h2"
-            action={
-              user
-                ? {
-                    label: 'Take an Exam',
-                    onClick: () => onNavigate('dashboard'),
-                  }
-                : undefined
-            }
-          />
+          season === null ? (
+            <EmptyState
+              icon={<Hourglass className="w-12 h-12 text-on-surface-variant opacity-40" />}
+              title="Leaderboard paused"
+              description="There is no active exam season right now. The board will reopen when an admin schedules the next CSE. Your future attempts will still count toward that season."
+              titleAs="h2"
+            />
+          ) : tab === 'topic' && level === 'sub-professional' ? (
+            <EmptyState
+              icon={<BarChart3 className="w-12 h-12 text-on-surface-variant opacity-40" />}
+              title="Per-topic boards for Sub-Professional are not yet available"
+              description="Sub-Professional questions aren't shipped yet. When they are, per-topic boards will appear here. For now, see the All-Time or This Week boards above."
+              titleAs="h2"
+            />
+          ) : (
+            <EmptyState
+              icon={<Trophy className="w-12 h-12 text-on-surface-variant opacity-40" />}
+              title="No submissions yet"
+              description={
+                tab === 'week'
+                  ? 'Be the first reviewer to land on the weekly board this season.'
+                  : tab === 'topic'
+                  ? 'No one has submitted an attempt for this topic this season.'
+                  : `Be the first to claim the top spot for ${season.label}.`
+              }
+              titleAs="h2"
+              action={
+                user
+                  ? {
+                      label: 'Take an Exam',
+                      onClick: () => onNavigate('dashboard'),
+                    }
+                  : undefined
+              }
+            />
+          )
         )}
 
         {status === 'ready' && entries.length > 0 && (

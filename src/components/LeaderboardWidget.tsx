@@ -139,11 +139,14 @@ export default function LeaderboardWidget({ onNavigate }: LeaderboardWidgetProps
         <div className="md:col-span-2 p-6">
           {loading ? (
             <p className="text-sm text-on-surface-variant">Loading this week's top scorers…</p>
+          ) : topThree.length === 0 && season === null ? (
+            <p className="text-sm text-on-surface-variant">
+              Leaderboard paused — no active exam season. Take an exam and your score will count
+              when the next season starts.
+            </p>
           ) : topThree.length === 0 ? (
             <p className="text-sm text-on-surface-variant">
-              {season
-                ? `No submissions yet for ${season.label}. Be the first to claim the top spot.`
-                : 'No submissions yet this season.'}
+              {`No submissions yet for ${season!.label}. Be the first to claim the top spot.`}
             </p>
           ) : (
             <ol className="space-y-2">

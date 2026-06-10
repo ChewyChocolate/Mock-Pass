@@ -157,6 +157,14 @@ in the `exam_seasons` table. Each action is gated by RLS — non-admins
 get a "You don't have access to this area" empty state if they try to
 navigate to `/admin` directly.
 
+## Known issues
+
+See [`QA_REPORT.md`](./QA_REPORT.md) for a prioritized list of bugs and
+design issues found during the most recent audit. **Top 5 fixes** (P0-2
+admin RLS, P0-1 leaderboard pause, P1-1 sign-in race, P0-3 handle TOCTOU,
+P2-10 sub-pro topic) are scheduled; the rest are documented for future
+batches.
+
 ## Data + privacy notes
 
 - The 150-item question bank is bundled with the JS bundle (no questions

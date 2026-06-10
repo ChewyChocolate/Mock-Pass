@@ -7,6 +7,9 @@
 -- current batch cramming for the same test date (not against users who
 -- already sat and passed a previous one).
 
+-- 0. Grants needed for is_admin_email() to call auth.email()
+grant usage on schema auth to authenticated;
+
 -- 1. Profiles table
 create table if not exists public.profiles (
   user_id    uuid primary key references auth.users(id) on delete cascade,
@@ -135,6 +138,13 @@ grant select on public.current_season to anon, authenticated;
 -- 4b. Admin RPC: check if the signed-in user is in the admin allowlist.
 -- Mirrors the constant in src/lib/admin.ts. Keep both in sync.
 -- SECURITY DEFINER so the RLS policies can call it without exposing the list.
+--
+-- IMPORTANT: We use auth.email() (not auth.jwt() ->> 'email') because
+-- GoTrue's default JWT does NOT include the email claim. auth.email()
+-- reads from auth.users via the JWT's sub and is the Supabase-recommended
+-- way to get the signed-in user's email in RLS policies.
+-- Requires: grant usage on schema auth to authenticated; (run once
+-- in the Supabase dashboard under Database > Roles > authenticated).
 create or replace function public.is_admin_email()
 returns boolean
 language sql
@@ -142,7 +152,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select lower(coalesce(auth.jwt() ->> 'email', '')) in (
+  select lower(coalesce(auth.email(), '')) in (
     'deguzmanchristianearl1@gmail.com'
   );
 $$;
@@ -273,7 +283,15 @@ group by td.user_id, p.handle, p.first_name, p.last_name, td.level, td.topic;
 grant select on public.leaderboard_season_topic to anon, authenticated;
 
 -- 10. RPC: handle availability check
-create or replace function public.is_handle_available(handle text)
+--
+-- exclude_user_id is an optional uuid used to skip the caller's own row.
+-- This closes the TOCTOU window where a user "changes" their handle to the
+-- same value: the RPC would otherwise return false because the row exists
+-- in the profiles table.
+create or replace function public.is_handle_available(
+  handle text,
+  exclude_user_id uuid default null
+)
 returns boolean
 language sql
 security definer
@@ -282,7 +300,8 @@ as $$
   select not exists (
     select 1 from public.profiles
     where profiles.handle = lower(is_handle_available.handle)
+      and (exclude_user_id is null or profiles.user_id <> exclude_user_id)
   );
 $$;
 
-grant execute on function public.is_handle_available(text) to authenticated;
+grant execute on function public.is_handle_available(text, uuid) to authenticated;

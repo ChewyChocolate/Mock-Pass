@@ -328,6 +328,12 @@ export function ExamProvider({ children }: { children: ReactNode }) {
     if (lastSyncedUserId.current === user.id) return;
     lastSyncedUserId.current = user.id;
 
+    // Capture a freshly-submitted local session (if any) before we wipe.
+    // This handles the offline-submit-then-sign-in case: the user submits
+    // an exam while offline, the sign-in effect fires DISCARD_HISTORY, the
+    // just-submitted session would otherwise be lost. We re-merge it after.
+    const pending = state.history[0] ?? null;
+
     let cancelled = false;
     (async () => {
       try {
@@ -349,7 +355,17 @@ export function ExamProvider({ children }: { children: ReactNode }) {
         if (historyLengthRef.current > 0 && result.history.length === 0) {
           return;
         }
-        dispatch({ type: 'HYDRATE_HISTORY', history: result.history });
+        // Offline-submit-then-sign-in case: re-merge the captured pending
+        // session if it isn't already in remote. Pre-merge it into the
+        // result so the subsequent HYDRATE_HISTORY includes it. The push
+        // effect will then upload it to the backend.
+        const remoteIds = new Set(result.history.map((s) => s.id));
+        if (pending && !remoteIds.has(pending.id)) {
+          const merged = [pending, ...result.history].slice(0, LIMITS.maxLocalHistory);
+          dispatch({ type: 'HYDRATE_HISTORY', history: merged });
+        } else {
+          dispatch({ type: 'HYDRATE_HISTORY', history: result.history });
+        }
       } catch (err) {
         console.warn('[mockpass] sync init failed:', err);
       }

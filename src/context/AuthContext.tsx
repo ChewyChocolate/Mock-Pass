@@ -318,9 +318,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(validation.error ?? 'Invalid handle.');
     }
     const handle = newHandle.trim().toLowerCase();
+    // Pass the current user_id so the RPC skips the caller's own row —
+    // otherwise "change to my current handle" reports "taken" because the
+    // row exists. Closes the TOCTOU window with the subsequent UPDATE.
     const { data: available, error: rpcError } = await clientRef.current.rpc(
       'is_handle_available',
-      { handle },
+      { handle, exclude_user_id: currentUserId },
     );
     if (rpcError) throw new Error(rpcError.message);
     if (!available) {
