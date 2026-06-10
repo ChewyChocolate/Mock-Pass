@@ -16,6 +16,7 @@ import LeaderboardScreen from './screens/LeaderboardScreen';
 import AdminSeasonsScreen from './screens/AdminSeasonsScreen';
 import AdminStatsScreen from './screens/AdminStatsScreen';
 import AdminSupportScreen from './screens/AdminSupportScreen';
+import AdminUsersScreen from './screens/AdminUsersScreen';
 import { type AdminSectionId } from './components/AdminSidebar';
 import './index.css';
 
@@ -32,6 +33,14 @@ function AdminRouter({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   if (section === 'support') {
     return (
       <AdminSupportScreen
+        onNavigate={onNavigate}
+        onSelectSection={setSection}
+      />
+    );
+  }
+  if (section === 'users') {
+    return (
+      <AdminUsersScreen
         onNavigate={onNavigate}
         onSelectSection={setSection}
       />

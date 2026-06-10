@@ -142,6 +142,24 @@ export interface SupportTicketWithEmail extends SupportTicket {
   user_email: string;
 }
 
+export interface AdminUserSearchResult {
+  user_id: string;
+  email: string;
+  handle: string | null;
+  created_at: string;
+  sessions_count: number;
+}
+
+export interface AdminUserSession {
+  id: string;
+  level: ExamLevel;
+  score: number;
+  correct: number;
+  total_questions: number;
+  submitted_at: number;
+  time_spent_seconds: number;
+}
+
 export interface SeasonFormValues {
   label: string;
   examDate: string;

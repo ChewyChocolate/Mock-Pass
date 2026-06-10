@@ -577,3 +577,121 @@ drop trigger if exists support_tickets_touch_updated_at on public.support_ticket
 create trigger support_tickets_touch_updated_at
   before update on public.support_tickets
   for each row execute function public.touch_updated_at();
+
+-- 13. Admin user search.
+-- Returns up to 20 users whose email or handle matches the search
+-- string. SECURITY DEFINER + is_admin_email() guard. Reads from
+-- auth.users, which the anon role cannot SELECT directly.
+create or replace function public.admin_search_users(search text)
+returns table (
+  user_id uuid,
+  email text,
+  handle text,
+  created_at timestamptz,
+  sessions_count bigint
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.admin_allowlist where email = lower(coalesce(auth.email(), ''))
+  ) then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  return query
+  select
+    au.id as user_id,
+    au.email,
+    p.handle,
+    au.created_at,
+    coalesce(s.cnt, 0) as sessions_count
+  from auth.users au
+  left join public.profiles p on p.user_id = au.id
+  left join (
+    select user_id, count(*) as cnt
+    from public.exam_sessions
+    group by user_id
+  ) s on s.user_id = au.id
+  where
+    search is null
+    or search = ''
+    or au.email ilike '%' || search || '%'
+    or (p.handle is not null and p.handle ilike '%' || search || '%')
+  order by au.created_at desc
+  limit 20;
+end;
+$$;
+
+grant execute on function public.admin_search_users(text) to authenticated;
+
+-- 14. Admin: get a user's exam sessions. SECURITY DEFINER bypasses RLS.
+create or replace function public.admin_get_user_sessions(target_user_id uuid)
+returns table (
+  id text,
+  level text,
+  score numeric,
+  correct int,
+  total_questions int,
+  submitted_at bigint,
+  time_spent_seconds int
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.admin_allowlist where email = lower(coalesce(auth.email(), ''))
+  ) then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  return query
+  select
+    es.id, es.level, es.score, es.correct, es.total_questions,
+    es.submitted_at, es.time_spent_seconds
+  from public.exam_sessions es
+  where es.user_id = target_user_id
+  order by es.submitted_at desc
+  limit 50;
+end;
+$$;
+
+grant execute on function public.admin_get_user_sessions(uuid) to authenticated;
+
+-- 15. Admin: delete a user's app data. SECURITY DEFINER bypasses RLS
+-- so the admin can delete without owning the rows. The auth.users row
+-- itself is NOT deleted (that requires the Supabase service role,
+-- which the client never sees). The result is "soft account removal":
+-- the user can no longer sign in because their profile/sessions/tickets
+-- are gone, and Supabase will reject sign-in for a deleted user
+-- once we add the call to auth.admin_delete_user() in a server-side
+-- context (deferred to v2).
+create or replace function public.admin_delete_user(target_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.admin_allowlist where email = lower(coalesce(auth.email(), ''))
+  ) then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  if target_user_id is null then
+    raise exception 'target_user_id is required';
+  end if;
+
+  delete from public.support_tickets where user_id = target_user_id;
+  delete from public.exam_sessions where user_id = target_user_id;
+  delete from public.profiles where user_id = target_user_id;
+end;
+$$;
+
+grant execute on function public.admin_delete_user(uuid) to authenticated;
