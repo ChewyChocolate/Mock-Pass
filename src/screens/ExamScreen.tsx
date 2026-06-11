@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Lock,
   AlertTriangle,
+  XCircle,
 } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
 import { Modal } from '../components/Modal';
@@ -85,6 +86,7 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
   const { state, start, selectAnswer, toggleFlag, goTo, next, prev, submit, reset, getStatus } = exam;
   const { currentQuestion, isFirst, isLast, answeredCount, flaggedCount } = exam;
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showAbortConfirm, setShowAbortConfirm] = useState(false);
   const [showNavigator, setShowNavigator] = useState(false);
   const [topicFilter, setTopicFilter] = useState<TopicFilter>('all');
 
@@ -365,6 +367,13 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
               <span className="text-xs font-bold uppercase tracking-widest hidden md:inline">Exit Exam</span>
             </button>
             <button
+              onClick={() => setShowAbortConfirm(true)}
+              className="flex items-center justify-center gap-2 text-on-surface-variant hover:text-error transition-all group px-4 py-2 rounded border border-transparent hover:border-error/30"
+            >
+              <XCircle className="w-5 h-5" />
+              <span className="text-xs font-bold uppercase tracking-widest hidden md:inline">Abort Exam</span>
+            </button>
+            <button
               onClick={() => setShowNavigator(true)}
               className="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all md:hidden mx-2"
             >
@@ -464,6 +473,43 @@ export default function ExamScreen({ onNavigate }: BaseScreenProps) {
             className="flex-1 py-3 bg-error text-on-error font-bold uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all"
           >
             Submit
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showAbortConfirm}
+        onClose={() => setShowAbortConfirm(false)}
+        labelledBy="abort-confirm-title"
+        describedBy="abort-confirm-desc"
+        panelClassName="max-w-md"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <XCircle className="w-6 h-6 text-error" />
+          <h3 id="abort-confirm-title" className="text-xl font-bold tracking-tight">
+            Abort exam?
+          </h3>
+        </div>
+        <p id="abort-confirm-desc" className="text-on-surface-variant mb-6 text-sm leading-relaxed">
+          Your progress on this exam will be discarded. All answers and flags will be
+          cleared, and the timer will be reset. This action cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowAbortConfirm(false)}
+            className="flex-1 py-3 border border-outline-variant text-on-surface font-bold uppercase tracking-widest text-xs hover:bg-surface-variant transition-all"
+          >
+            Continue
+          </button>
+          <button
+            onClick={() => {
+              reset();
+              setShowAbortConfirm(false);
+              onNavigate('dashboard');
+            }}
+            className="flex-1 py-3 bg-error text-on-error font-bold uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all"
+          >
+            Abort
           </button>
         </div>
       </Modal>
