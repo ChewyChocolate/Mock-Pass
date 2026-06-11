@@ -82,7 +82,13 @@ export async function pushSession(
   summary: ExamSessionSummary,
 ): Promise<PushResult> {
   const row = summaryToRow(summary, userId);
-  const { error } = await client.from(TABLE).insert(row);
+  // Idempotent: re-pushing the same session id is a no-op. Without this,
+  // a React StrictMode double-invoke of the push effect (or any other race)
+  // produces a `duplicate key value violates unique constraint
+  // "exam_sessions_pkey"` warning on the second call.
+  const { error } = await client
+    .from(TABLE)
+    .upsert(row, { onConflict: 'id', ignoreDuplicates: true });
   if (error) {
     return { ok: false, error: error.message };
   }

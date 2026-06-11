@@ -171,6 +171,7 @@ describe('fetchRemoteHistory / pushSession', () => {
   function makeFakeClient(handlers: {
     selectImpl?: () => Promise<{ data: unknown; error: { message: string } | null }>;
     insertImpl?: () => Promise<{ error: { message: string } | null }>;
+    upsertImpl?: () => Promise<{ error: { message: string } | null }>;
   }): SupabaseClient {
     return {
       from: vi.fn().mockImplementation((table: string) => {
@@ -188,6 +189,11 @@ describe('fetchRemoteHistory / pushSession', () => {
           insert: vi.fn().mockImplementation(() =>
             handlers.insertImpl
               ? handlers.insertImpl()
+              : Promise.resolve({ error: null }),
+          ),
+          upsert: vi.fn().mockImplementation(() =>
+            handlers.upsertImpl
+              ? handlers.upsertImpl()
               : Promise.resolve({ error: null }),
           ),
         };
@@ -234,24 +240,40 @@ describe('fetchRemoteHistory / pushSession', () => {
     expect(result.history).toEqual([]);
   });
 
-  it('pushSession sends the row built by summaryToRow', async () => {
-    const insert = vi.fn().mockResolvedValue({ error: null });
+  it('pushSession sends the row built by summaryToRow (via upsert)', async () => {
+    const upsert = vi.fn().mockResolvedValue({ error: null });
     const client = {
-      from: vi.fn().mockReturnValue({ insert }),
+      from: vi.fn().mockReturnValue({ upsert }),
     } as unknown as SupabaseClient;
     const result = await pushSession(client, 'u', sampleSummary);
     expect(result.ok).toBe(true);
-    expect(insert).toHaveBeenCalledWith(
+    expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({ id: sampleSummary.id, user_id: 'u', score: 82.5 }),
+      expect.objectContaining({ onConflict: 'id', ignoreDuplicates: true }),
     );
   });
 
-  it('pushSession reports error on insert failure', async () => {
+  it('pushSession reports error on upsert failure', async () => {
     const client = makeFakeClient({
-      insertImpl: () => Promise.resolve({ error: { message: 'duplicate key' } }),
+      upsertImpl: () => Promise.resolve({ error: { message: 'duplicate key' } }),
     });
     const result = await pushSession(client, 'u', sampleSummary);
     expect(result.ok).toBe(false);
     expect(result.error).toBe('duplicate key');
+  });
+
+  it('pushSession is idempotent on duplicate id (no warning, ok: true)', async () => {
+    let calls = 0;
+    const client = makeFakeClient({
+      upsertImpl: () => {
+        calls += 1;
+        return Promise.resolve({ error: null });
+      },
+    });
+    const r1 = await pushSession(client, 'u', sampleSummary);
+    const r2 = await pushSession(client, 'u', sampleSummary);
+    expect(r1.ok).toBe(true);
+    expect(r2.ok).toBe(true);
+    expect(calls).toBe(2);
   });
 });
