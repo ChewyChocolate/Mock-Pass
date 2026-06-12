@@ -19,11 +19,14 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [forgotState, setForgotState] = useState<ForgotState>('idle');
   const [submitting, setSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const displayError = error ?? localError;
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);
+    setLocalError(null);
     clearError();
     try {
       if (mode === 'sign-in') {
@@ -37,8 +40,8 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
       }
       onNavigate('dashboard');
     } catch (err) {
-      // AuthContext's `error` state already holds the message.
-      void err;
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setLocalError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -46,6 +49,7 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
 
   const switchMode = () => {
     clearError();
+    setLocalError(null);
     setFirstName('');
     setLastName('');
     setMode((m) => (m === 'sign-in' ? 'sign-up' : 'sign-in'));
@@ -53,6 +57,7 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
 
   const goToForgot = () => {
     clearError();
+    setLocalError(null);
     setPassword('');
     setForgotState('idle');
     setMode('forgot');
@@ -60,6 +65,7 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
 
   const backToSignIn = () => {
     clearError();
+    setLocalError(null);
     setForgotState('idle');
     setMode('sign-in');
   };
@@ -70,9 +76,13 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
 
   const resendReset = () => {
     clearError();
+    setLocalError(null);
     setSubmitting(true);
     resetPasswordForEmail(email)
-      .catch((err) => void err)
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+        setLocalError(msg);
+      })
       .finally(() => setSubmitting(false));
   };
 
@@ -202,9 +212,9 @@ export default function LoginScreen({ onNavigate }: BaseScreenProps) {
             )}
 
             {/* Error message */}
-            {error && (
+            {displayError && (
               <p role="alert" className="text-xs text-error bg-error-container/40 border border-error/30 rounded px-3 py-2">
-                {error}
+                {displayError}
               </p>
             )}
 

@@ -217,7 +217,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user: newSession?.user ?? null,
           session: newSession,
           recoveryMode: true,
-          error: null,
         }));
         setDevAuthUser(newSession?.user ?? null);
         userIdRef.current = newSession?.user?.id ?? null;
@@ -232,7 +231,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           session: null,
           recoveryMode: false,
           handle: null,
-          error: null,
         }));
         setDevAuthUser(null);
         userIdRef.current = null;
@@ -244,7 +242,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: newSession?.user ?? null,
         session: newSession,
         recoveryMode: false,
-        error: null,
       }));
       setDevAuthUser(newSession?.user ?? null);
       userIdRef.current = newSession?.user?.id ?? null;
