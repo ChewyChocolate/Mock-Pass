@@ -259,15 +259,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!clientRef.current) {
-      throw new SupabaseConfigError('Supabase is not configured.');
+      const msg = 'Supabase is not configured.';
+      setState((prev) => ({ ...prev, error: msg }));
+      throw new SupabaseConfigError(msg);
     }
     const { error } = await clientRef.current.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
+    if (error) {
+      setState((prev) => ({ ...prev, error: error.message }));
+      throw new Error(error.message);
+    }
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, profile?: UserProfile) => {
     if (!clientRef.current) {
-      throw new SupabaseConfigError('Supabase is not configured.');
+      const msg = 'Supabase is not configured.';
+      setState((prev) => ({ ...prev, error: msg }));
+      throw new SupabaseConfigError(msg);
     }
     const data = normalizeProfile(profile);
     const { data: signUpData, error } = await clientRef.current.auth.signUp({
@@ -275,7 +282,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: { data },
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      setState((prev) => ({ ...prev, error: error.message }));
+      throw new Error(error.message);
+    }
     const newUser = signUpData.user;
     if (newUser && signUpData.session) {
       try {
@@ -355,20 +365,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPasswordForEmail = useCallback(async (email: string) => {
     if (!clientRef.current) {
-      throw new SupabaseConfigError('Supabase is not configured.');
+      const msg = 'Supabase is not configured.';
+      setState((prev) => ({ ...prev, error: msg }));
+      throw new SupabaseConfigError(msg);
     }
     const { error } = await clientRef.current.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin + window.location.pathname,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      setState((prev) => ({ ...prev, error: error.message }));
+      throw new Error(error.message);
+    }
   }, []);
 
   const updatePassword = useCallback(async (newPassword: string) => {
     if (!clientRef.current) {
-      throw new SupabaseConfigError('Supabase is not configured.');
+      const msg = 'Supabase is not configured.';
+      setState((prev) => ({ ...prev, error: msg }));
+      throw new SupabaseConfigError(msg);
     }
     const { error } = await clientRef.current.auth.updateUser({ password: newPassword });
-    if (error) throw new Error(error.message);
+    if (error) {
+      setState((prev) => ({ ...prev, error: error.message }));
+      throw new Error(error.message);
+    }
   }, []);
 
   const exitRecoveryMode = useCallback(() => {
