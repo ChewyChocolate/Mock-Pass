@@ -356,10 +356,16 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
         {/* Filter bar */}
         <SectionCard>
           <div className="flex flex-col md:flex-row gap-3">
-            <div className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-sm self-start">
+            <div
+              role="radiogroup"
+              aria-label="Filter questions by exam level"
+              className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-sm self-start"
+            >
               {(['professional', 'sub-professional'] as const).map((lvl) => (
                 <button
                   key={lvl}
+                  role="radio"
+                  aria-checked={filter.level === lvl}
                   onClick={() => setFilter((f) => ({ ...f, level: lvl }))}
                   className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest rounded-sm ${
                     filter.level === lvl
@@ -395,6 +401,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
             </div>
 
             <select
+              aria-label="Filter questions by topic"
               value={filter.topic}
               onChange={(e) =>
                 setFilter((f) => ({ ...f, topic: e.target.value as QuestionTopic }))
@@ -409,11 +416,17 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
             </select>
 
             <div className="relative flex-1">
+              <label htmlFor="question-search" className="sr-only">
+                Search questions
+              </label>
               <Search className="w-4 h-4 text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
+                id="question-search"
+                type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by id, prompt, or topic…"
+                aria-label="Search questions by id, prompt, or topic"
                 className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm"
               />
             </div>
@@ -475,6 +488,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
           <div className="mt-6 space-y-2">
             {filtered.map((q) => {
               const isOpen = expanded === q.id;
+              const panelId = `q-panel-${q.id}`;
               return (
                 <div
                   key={q.id}
@@ -484,9 +498,10 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                     onClick={() => setExpanded(isOpen ? null : q.id)}
                     className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-surface-container/50 transition-colors"
                     aria-expanded={isOpen}
+                    aria-controls={panelId}
                   >
                     <ChevronDown
-                      className={`w-4 h-4 text-on-surface-variant transition-transform shrink-0 ${
+                      className={`w-4 h-4 text-on-surface-variant transition-transform shrink-0 motion-reduce:transition-none ${
                         isOpen ? 'rotate-0' : '-rotate-90'
                       }`}
                     />
@@ -497,14 +512,22 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                       </p>
                     </div>
                     {!q.is_active && (
-                      <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border border-on-surface-variant/40 text-on-surface-variant bg-surface-container/40 shrink-0">
+                      <span
+                        aria-label="Question disabled, hidden from exam screen"
+                        className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border border-on-surface-variant/40 text-on-surface-variant bg-surface-container/40 shrink-0"
+                      >
                         Disabled
                       </span>
                     )}
                   </button>
 
                   {isOpen && (
-                    <div className="px-4 pb-4 pt-2 border-t border-outline-variant/30 bg-surface space-y-3">
+                    <div
+                      id={panelId}
+                      role="region"
+                      aria-label={`Details for question ${q.id}`}
+                      className="px-4 pb-4 pt-2 border-t border-outline-variant/30 bg-surface space-y-3"
+                    >
                       <div className="space-y-2">
                         {(['A', 'B', 'C', 'D'] as const).map((letter) => {
                           const isCorrect = q.correct_option_id === letter;
@@ -680,16 +703,17 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               />
             </div>
 
-            <div className="space-y-2">
-              <p className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase">
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase">
                 Options
-              </p>
+              </legend>
               {(['A', 'B', 'C', 'D'] as const).map((letter) => (
                 <div key={letter} className="flex items-center gap-2">
                   <label className="inline-flex items-center cursor-pointer">
                     <input
                       type="radio"
                       name="correct"
+                      value={letter}
                       checked={editing.values.correct_option_id === letter}
                       onChange={() =>
                         setEditing((s) =>
@@ -701,9 +725,11 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                             : s,
                         )
                       }
+                      aria-label={`Mark option ${letter} as the correct answer`}
                       className="sr-only"
                     />
                     <span
+                      aria-hidden="true"
                       className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center cursor-pointer ${
                         editing.values.correct_option_id === letter
                           ? 'bg-tertiary text-on-primary'
@@ -738,7 +764,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                   />
                 </div>
               ))}
-            </div>
+            </fieldset>
 
             <div>
               <label
@@ -762,8 +788,9 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               />
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-on-surface">
+            <label htmlFor="qIsActive" className="flex items-center gap-2 text-sm text-on-surface">
               <input
+                id="qIsActive"
                 type="checkbox"
                 checked={editing.values.is_active}
                 onChange={(e) =>
