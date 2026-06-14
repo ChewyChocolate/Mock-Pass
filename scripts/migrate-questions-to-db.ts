@@ -28,6 +28,8 @@ interface QuestionRow {
   correct_option_id: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   is_active: boolean;
+  difficulty: number | null;
+  tags: string[];
 }
 
 function loadEnvLocal() {
@@ -94,6 +96,8 @@ function toRow(q: BundledQuestion, level: 'professional' | 'sub-professional'): 
     correct_option_id: q.correctOptionId,
     explanation: q.explanation,
     is_active: true,
+    difficulty: null, // backfill in a follow-up; default 0
+    tags: [],
   };
 }
 

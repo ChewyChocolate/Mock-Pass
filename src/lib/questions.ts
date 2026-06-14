@@ -19,6 +19,10 @@ export interface QuestionRow {
   correct_option_id: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   is_active: boolean;
+  /** 1 (easiest) .. 5 (hardest), or null when unrated. */
+  difficulty: number | null;
+  /** Free-form tags (e.g. "needs-review"). Always an array; default []. */
+  tags: string[];
   created_at?: string;
   updated_at?: string;
 }

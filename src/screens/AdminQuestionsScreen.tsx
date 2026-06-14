@@ -59,6 +59,8 @@ function defaultFormValues(): SaveQuestionInput {
     correct_option_id: 'A',
     explanation: '',
     is_active: true,
+    difficulty: null,
+    tags: [],
   };
 }
 
@@ -86,6 +88,9 @@ export default function AdminQuestionsScreen({
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<'active' | 'disabled' | 'all'>('active');
   const [searchAllTopics, setSearchAllTopics] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string>('');
+  const [difficultyFilter, setDifficultyFilter] = useState<'all' | 'unrated' | '1' | '2' | '3' | '4' | '5'>('all');
+  const [sortBy, setSortBy] = useState<'id' | 'updated_at' | 'difficulty'>('id');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   // Per-topic row counts for the current level, used to render
@@ -194,17 +199,51 @@ export default function AdminQuestionsScreen({
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
+    const tagQ = tagFilter.trim().toLowerCase();
+    let rows = questions;
     // When server-side search is active, the rows are already
-    // filtered by Supabase; we just pass them through.
-    if (searchAllTopics && q) return questions;
-    if (!q) return questions;
-    return questions.filter(
-      (x) =>
-        x.id.toLowerCase().includes(q) ||
-        x.prompt.toLowerCase().includes(q) ||
-        x.topic.toLowerCase().includes(q),
-    );
-  }, [questions, debouncedSearch, searchAllTopics]);
+    // filtered by Supabase; we still apply client-only filters
+    // (tag, difficulty) on top.
+    if (!(searchAllTopics && q)) {
+      if (q) {
+        rows = rows.filter(
+          (x) =>
+            x.id.toLowerCase().includes(q) ||
+            x.prompt.toLowerCase().includes(q) ||
+            x.topic.toLowerCase().includes(q),
+        );
+      }
+    }
+    if (tagQ) {
+      rows = rows.filter((x) =>
+        x.tags.some((t) => t.toLowerCase().includes(tagQ)),
+      );
+    }
+    if (difficultyFilter !== 'all') {
+      if (difficultyFilter === 'unrated') {
+        rows = rows.filter((x) => x.difficulty == null);
+      } else {
+        const want = Number(difficultyFilter);
+        rows = rows.filter((x) => x.difficulty === want);
+      }
+    }
+    // Sort. `id` and `updated_at` are ascending; `difficulty`
+    // groups unrated (null) last so the easy / hard buckets are
+    // visible at the top of the list.
+    const sorted = [...rows];
+    sorted.sort((a, b) => {
+      if (sortBy === 'difficulty') {
+        const aD = a.difficulty ?? 99;
+        const bD = b.difficulty ?? 99;
+        return aD - bD;
+      }
+      if (sortBy === 'updated_at') {
+        return (a.updated_at ?? '').localeCompare(b.updated_at ?? '');
+      }
+      return a.id.localeCompare(b.id);
+    });
+    return sorted;
+  }, [questions, debouncedSearch, searchAllTopics, tagFilter, difficultyFilter, sortBy]);
 
   const openNew = () => {
     setEditing({
@@ -227,6 +266,8 @@ export default function AdminQuestionsScreen({
         correct_option_id: q.correct_option_id,
         explanation: q.explanation,
         is_active: q.is_active,
+        difficulty: q.difficulty,
+        tags: [...q.tags],
       },
       saving: false,
       saveError: null,
@@ -612,6 +653,43 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               />
               Search all topics
             </label>
+
+            <input
+              type="search"
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              placeholder="Filter by tag…"
+              aria-label="Filter questions by tag"
+              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm w-32"
+            />
+
+            <select
+              aria-label="Filter questions by difficulty"
+              value={difficultyFilter}
+              onChange={(e) =>
+                setDifficultyFilter(e.target.value as typeof difficultyFilter)
+              }
+              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm"
+            >
+              <option value="all">All difficulties</option>
+              <option value="unrated">Unrated</option>
+              <option value="1">★ (Easy)</option>
+              <option value="2">★★</option>
+              <option value="3">★★★</option>
+              <option value="4">★★★★</option>
+              <option value="5">★★★★★ (Hard)</option>
+            </select>
+
+            <select
+              aria-label="Sort questions by"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm"
+            >
+              <option value="id">Sort: ID</option>
+              <option value="updated_at">Sort: Recently updated</option>
+              <option value="difficulty">Sort: Difficulty</option>
+            </select>
           </div>
         </SectionCard>
 
@@ -1050,6 +1128,74 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                 (inactive questions are hidden from the exam screen)
               </span>
             </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="qDifficulty"
+                  className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase"
+                >
+                  Difficulty
+                </label>
+                <select
+                  id="qDifficulty"
+                  value={editing.values.difficulty ?? ''}
+                  onChange={(e) =>
+                    setEditing((s) =>
+                      s
+                        ? {
+                            ...s,
+                            values: {
+                              ...s.values,
+                              difficulty:
+                                e.target.value === '' ? null : Number(e.target.value),
+                            },
+                          }
+                        : s,
+                    )
+                  }
+                  className="w-full mt-1 bg-surface-container-low border border-outline-variant rounded px-3 py-2 text-on-surface"
+                >
+                  <option value="">Unrated</option>
+                  <option value="1">★ (Easy)</option>
+                  <option value="2">★★</option>
+                  <option value="3">★★★</option>
+                  <option value="4">★★★★</option>
+                  <option value="5">★★★★★ (Hard)</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="qTags"
+                  className="text-xs font-semibold tracking-widest text-on-surface-variant ml-1 uppercase"
+                >
+                  Tags
+                </label>
+                <input
+                  id="qTags"
+                  type="text"
+                  value={editing.values.tags.join(', ')}
+                  onChange={(e) =>
+                    setEditing((s) =>
+                      s
+                        ? {
+                            ...s,
+                            values: {
+                              ...s.values,
+                              tags: e.target.value
+                                .split(',')
+                                .map((t) => t.trim())
+                                .filter(Boolean),
+                            },
+                          }
+                        : s,
+                    )
+                  }
+                  placeholder="comma-separated, e.g. needs-review, math-heavy"
+                  className="w-full mt-1 bg-surface-container-low border border-outline-variant rounded px-3 py-2 text-on-surface text-sm"
+                />
+              </div>
+            </div>
 
             {editing.saveError && (
               <p role="alert" className="text-xs text-error">

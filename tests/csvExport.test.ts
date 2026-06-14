@@ -12,6 +12,8 @@ function makeRow(overrides: Partial<AdminQuestion> = {}): AdminQuestion {
     correct_option_id: 'B',
     explanation: 'Joyful is a synonym of happy.',
     is_active: true,
+    difficulty: null,
+    tags: [],
     ...overrides,
   };
 }

@@ -38,6 +38,13 @@ create table if not exists public.questions (
   correct_option_id  text not null check (correct_option_id in ('A', 'B', 'C', 'D')),
   explanation       text not null check (length(explanation) between 1 and 4000),
   is_active         boolean not null default true,
+  -- Editorial metadata. Both columns are optional; existing rows
+  -- will get NULL on migration. difficulty is 1 (easiest) to 5
+  -- (hardest) and tags is a free-form text[] for ad-hoc labels
+  -- (e.g. 'trivia', 'math-heavy', 'needs-review'). The CHECK on
+  -- difficulty matches the 5-star UI in the admin form.
+  difficulty       smallint check (difficulty is null or (difficulty between 1 and 5)),
+  tags             text[] not null default '{}',
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   constraint        questions_options_shape

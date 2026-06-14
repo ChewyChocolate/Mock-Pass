@@ -53,6 +53,8 @@ function makeSampleRow(overrides: Partial<{ id: string; level: 'professional' | 
     correct_option_id: 'A' as const,
     explanation: 'Luzon is the largest island.',
     is_active: true,
+    difficulty: null,
+    tags: [],
   };
 }
 
