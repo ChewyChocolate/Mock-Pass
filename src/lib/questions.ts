@@ -19,7 +19,16 @@ export interface QuestionRow {
   correct_option_id: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
+
+/**
+ * Read shape used by the admin Question Bank screen. Aliased to the
+ * DB row shape so a future column add only has to land in one place
+ * (QuestionRow) instead of three near-identical interfaces.
+ */
+export type AdminQuestion = QuestionRow;
 
 let proOverride: Question[] | null = null;
 let subProOverride: Question[] | null = null;
@@ -133,17 +142,6 @@ export function getQuestionsCacheTimestamp(level: ExamLevel): number | null {
 // Admin CRUD (read from admin, write via standard `from()`; admin RLS is open)
 // ----------------------------------------------------------------------------
 
-export interface AdminQuestion {
-  id: string;
-  level: ExamLevel;
-  topic: QuestionTopic;
-  prompt: string;
-  options: { A: string; B: string; C: string; D: string };
-  correct_option_id: 'A' | 'B' | 'C' | 'D';
-  explanation: string;
-  is_active: boolean;
-}
-
 export interface FetchAdminQuestionsResult {
   ok: boolean;
   questions: AdminQuestion[];
@@ -180,16 +178,13 @@ export async function fetchAdminQuestions(
   return { ok: true, questions: (data ?? []) as AdminQuestion[] };
 }
 
-export interface SaveQuestionInput {
-  id: string;
-  level: ExamLevel;
-  topic: QuestionTopic;
-  prompt: string;
-  options: { A: string; B: string; C: string; D: string };
-  correct_option_id: 'A' | 'B' | 'C' | 'D';
-  explanation: string;
-  is_active: boolean;
-}
+/**
+ * Write shape used by the admin edit form and by saveQuestion().
+ * Omits the server-managed timestamps so a stale client payload
+ * can never clobber them; the DB trigger on update handles
+ * updated_at and the default on insert handles created_at.
+ */
+export type SaveQuestionInput = Omit<QuestionRow, 'created_at' | 'updated_at'>;
 
 export interface SaveQuestionResult {
   ok: boolean;
