@@ -81,6 +81,7 @@ export default function AdminQuestionsScreen({
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'active' | 'disabled' | 'all'>('active');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -112,6 +113,7 @@ export default function AdminQuestionsScreen({
       const result = await fetchAdminQuestions(client, {
         level: filter.level,
         topic: filter.topic,
+        isActive: activeFilter === 'all' ? undefined : activeFilter === 'active',
       });
       if (myToken !== refreshTokenRef.current) return; // superseded
       if (!result.ok) {
@@ -131,7 +133,7 @@ export default function AdminQuestionsScreen({
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, filter.level, filter.topic, dbLoaded]);
+  }, [isAdmin, filter.level, filter.topic, activeFilter, dbLoaded]);
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
@@ -370,6 +372,28 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               ))}
             </div>
 
+            <div
+              role="radiogroup"
+              aria-label="Show active, disabled, or all questions"
+              className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-sm self-start"
+            >
+              {(['active', 'disabled', 'all'] as const).map((opt) => (
+                <button
+                  key={opt}
+                  role="radio"
+                  aria-checked={activeFilter === opt}
+                  onClick={() => setActiveFilter(opt)}
+                  className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest rounded-sm ${
+                    activeFilter === opt
+                      ? 'bg-primary text-on-primary'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {opt === 'active' ? 'Active' : opt === 'disabled' ? 'Disabled' : 'All'}
+                </button>
+              ))}
+            </div>
+
             <select
               value={filter.topic}
               onChange={(e) =>
@@ -420,10 +444,20 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
             <SectionCard>
               <EmptyState
                 icon={<MessageSquare className="w-12 h-12 text-on-surface-variant opacity-40" />}
-                title={questions.length === 0 ? 'No questions in this topic yet' : 'No matches'}
+                title={
+                  questions.length === 0
+                    ? activeFilter === 'disabled'
+                      ? 'No disabled questions in this topic'
+                      : activeFilter === 'all'
+                      ? 'No questions in this topic yet'
+                      : 'No active questions in this topic'
+                    : 'No matches'
+                }
                 description={
                   questions.length === 0
-                    ? 'Add the first one with "New Question" above.'
+                    ? activeFilter === 'disabled'
+                      ? 'Disabled questions you create here will appear in this list.'
+                      : 'Add the first one with "New Question" above.'
                     : 'Try a different search term.'
                 }
                 titleAs="h2"
