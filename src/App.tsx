@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import type { Screen } from './types';
 import { ThemeProvider } from './ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -13,132 +13,19 @@ import SupportScreen from './screens/SupportScreen';
 import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import LeaderboardScreen from './screens/LeaderboardScreen';
-import AdminSeasonsScreen from './screens/AdminSeasonsScreen';
-import AdminStatsScreen from './screens/AdminStatsScreen';
-import AdminSupportScreen from './screens/AdminSupportScreen';
-import AdminUsersScreen from './screens/AdminUsersScreen';
-import AdminQuestionsScreen from './screens/AdminQuestionsScreen';
-import { type AdminSectionId } from './components/AdminSidebar';
 import { preloadQuestions } from './hooks/useQuestions';
-import { STORAGE_KEYS } from './lib/storageKeys';
+import {
+  readPersistedScreen,
+  writePersistedScreen,
+} from './lib/persistedNavigation';
 import { ToastProvider } from './components/Toast';
 import './index.css';
 
-const VALID_SCREENS: ReadonlySet<Screen> = new Set<Screen>([
-  'login',
-  'dashboard',
-  'review',
-  'exam',
-  'performance',
-  'support',
-  'profile',
-  'leaderboard',
-  'admin',
-]);
-
-const VALID_ADMIN_SECTIONS: ReadonlySet<AdminSectionId> = new Set<AdminSectionId>([
-  'seasons',
-  'users',
-  'questions',
-  'support',
-  'stats',
-]);
-
-function readPersistedScreen(): Screen {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.screen);
-    if (raw && (VALID_SCREENS as ReadonlySet<string>).has(raw)) {
-      return raw as Screen;
-    }
-  } catch {
-    // localStorage may be disabled (private mode, sandboxed iframe);
-    // fall through to the default.
-  }
-  return 'login';
-}
-
-function writePersistedScreen(screen: Screen): void {
-  try {
-    if (screen === 'login') {
-      localStorage.removeItem(STORAGE_KEYS.screen);
-    } else {
-      localStorage.setItem(STORAGE_KEYS.screen, screen);
-    }
-  } catch {
-    // Best effort. If localStorage is unavailable the in-memory
-    // currentScreen still works for the current page life.
-  }
-}
-
-function readPersistedAdminSection(): AdminSectionId {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.adminSection);
-    if (raw && (VALID_ADMIN_SECTIONS as ReadonlySet<string>).has(raw)) {
-      return raw as AdminSectionId;
-    }
-  } catch {
-    // Same localStorage-may-be-disabled caveat as above.
-  }
-  return 'seasons';
-}
-
-function writePersistedAdminSection(section: AdminSectionId): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.adminSection, section);
-  } catch {
-    // Best effort; in-memory state still works for the page life.
-  }
-}
-
-function AdminRouter({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [section, setSectionState] = useState<AdminSectionId>(() => readPersistedAdminSection());
-
-  // Mirror the screen-level persistence: every section change is
-  // written to localStorage so a hard refresh (or a tab restore)
-  // brings the admin back to the same section.
-  const setSection = (next: AdminSectionId) => {
-    setSectionState(next);
-    writePersistedAdminSection(next);
-  };
-  if (section === 'stats') {
-    return (
-      <AdminStatsScreen
-        onNavigate={onNavigate}
-        onSelectSection={setSection}
-      />
-    );
-  }
-  if (section === 'support') {
-    return (
-      <AdminSupportScreen
-        onNavigate={onNavigate}
-        onSelectSection={setSection}
-      />
-    );
-  }
-  if (section === 'users') {
-    return (
-      <AdminUsersScreen
-        onNavigate={onNavigate}
-        onSelectSection={setSection}
-      />
-    );
-  }
-  if (section === 'questions') {
-    return (
-      <AdminQuestionsScreen
-        onNavigate={onNavigate}
-        onSelectSection={setSection}
-      />
-    );
-  }
-  return (
-    <AdminSeasonsScreen
-      onNavigate={onNavigate}
-      onSelectSection={setSection}
-    />
-  );
-}
+// Admin section is the biggest single chunk in the app (5 screens,
+// the questions CRUD UI, the questions table). Code-split it so
+// non-admin users don't pay for it on first paint. The chunk is
+// fetched on demand when the user navigates to the admin screen.
+const AdminRouter = lazy(() => import('./screens/AdminRouter'));
 
 function Router() {
   const [currentScreen, setCurrentScreenState] = useState<Screen>(() => readPersistedScreen());
@@ -204,7 +91,19 @@ function Router() {
   if (currentScreen === 'support') return <SupportScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'profile') return <ProfileScreen onNavigate={handleNavigate} />;
   if (currentScreen === 'leaderboard') return <LeaderboardScreen onNavigate={handleNavigate} />;
-  if (currentScreen === 'admin') return <AdminRouter onNavigate={handleNavigate} />;
+  if (currentScreen === 'admin') {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-surface flex items-center justify-center">
+            <p className="text-sm text-on-surface-variant">Loading admin console…</p>
+          </div>
+        }
+      >
+        <AdminRouter onNavigate={handleNavigate} />
+      </Suspense>
+    );
+  }
   return <ExamScreen onNavigate={handleNavigate} />;
 }
 
