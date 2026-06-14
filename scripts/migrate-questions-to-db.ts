@@ -2,7 +2,6 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createRequire } from 'node:module';
-import 'dotenv/config';
 
 const require = createRequire(import.meta.url);
 
