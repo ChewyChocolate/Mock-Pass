@@ -600,6 +600,14 @@ create trigger support_tickets_touch_updated_at
 -- RETURNS TABLE output column is named `user_email` (not `email`)
 -- so the output schema cannot shadow a source column of the same
 -- name.
+--
+-- Drop the old signature before recreating with the new RETURNS TABLE
+-- shape (the column rename changes the row type). Postgres refuses to
+-- change the return type of an existing function via CREATE OR REPLACE;
+-- the explicit DROP makes the script idempotent across first-run and
+-- rerun. (drop function ... if exists is also safe if the function
+-- doesn't exist yet.)
+drop function if exists public.admin_search_users(text);
 create or replace function public.admin_search_users(search text)
 returns table (
   user_id uuid,
