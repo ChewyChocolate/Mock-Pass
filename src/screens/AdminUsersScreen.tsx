@@ -46,7 +46,7 @@ export default function AdminUsersScreen({
   const [searchInput, setSearchInput] = useState('');
   const [section, setSection] = useState<AdminSectionId>('users');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; email: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; user_email: string } | null>(null);
 
   const handleSectionSelect = (id: AdminSectionId) => {
     if (onSelectSection) onSelectSection(id);
@@ -72,7 +72,7 @@ export default function AdminUsersScreen({
       // Surface the error by leaving the dialog open with a new body
       // (overwriting the body for the next render via setPendingDelete).
       setPendingDelete((prev) =>
-        prev ? { ...prev, email: `${prev.email} (error: ${result.error})` } : prev,
+        prev ? { ...prev, user_email: `${prev.user_email} (error: ${result.error})` } : prev,
       );
     }
   };
@@ -177,7 +177,7 @@ export default function AdminUsersScreen({
                       }`}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-on-surface truncate">{u.email}</p>
+                      <p className="font-bold text-on-surface truncate">{u.user_email}</p>
                       <div className="flex items-center gap-3 text-[10px] text-on-surface-variant uppercase tracking-widest">
                         {u.handle && <span>@{u.handle}</span>}
                         <span className="inline-flex items-center gap-1">
@@ -198,7 +198,7 @@ export default function AdminUsersScreen({
                           <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">
                             Email
                           </p>
-                          <p className="text-sm text-on-surface break-all">{u.email}</p>
+                          <p className="text-sm text-on-surface break-all">{u.user_email}</p>
                         </div>
                         <div className="bg-surface-container-low p-3 rounded">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">
@@ -271,7 +271,7 @@ export default function AdminUsersScreen({
 
                       <div className="mt-4 flex flex-wrap gap-2 justify-end">
                         <a
-                          href={`mailto:${u.email}`}
+                          href={`mailto:${u.user_email}`}
                           className="bg-surface-container-high border border-outline-variant text-on-surface px-3 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-surface-variant transition-all inline-flex items-center gap-1"
                         >
                           <Mail className="w-3 h-3" />
@@ -279,7 +279,7 @@ export default function AdminUsersScreen({
                         </a>
                         <button
                           onClick={() =>
-                            setPendingDelete({ id: u.user_id, email: u.email })
+                            setPendingDelete({ id: u.user_id, user_email: u.user_email })
                           }
                           className="bg-error-container border border-error/40 text-error px-3 py-2 rounded text-xs font-bold uppercase tracking-widest hover:brightness-110 transition-all inline-flex items-center gap-1"
                         >
@@ -303,7 +303,7 @@ export default function AdminUsersScreen({
           pendingDelete ? (
             <>
               This will permanently remove
-              <span className="font-mono text-on-surface mx-1">{pendingDelete.email}</span>
+              <span className="font-mono text-on-surface mx-1">{pendingDelete.user_email}</span>
               's profile, exam sessions, and support tickets. The
               auth.users row itself is preserved (deferred to v2).
             </>

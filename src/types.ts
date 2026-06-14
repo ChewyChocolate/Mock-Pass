@@ -144,7 +144,7 @@ export interface SupportTicketWithEmail extends SupportTicket {
 
 export interface AdminUserSearchResult {
   user_id: string;
-  email: string;
+  user_email: string;
   handle: string | null;
   created_at: string;
   sessions_count: number;

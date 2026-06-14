@@ -595,13 +595,15 @@ create trigger support_tickets_touch_updated_at
 -- in production (Postgres 15), apparently because the RETURNS TABLE
 -- output column "email" was being pulled into the subquery's scope
 -- resolution along with the outer column references. The CTE form
--- isolates the scope. The explicit `as email` / `as handle` aliases
--- on the projection are belt-and-suspenders.
--- auth.users, which the anon role cannot SELECT directly.
+-- isolates the scope. The explicit `as user_email` / `as handle`
+-- aliases on the projection are belt-and-suspenders, AND the
+-- RETURNS TABLE output column is named `user_email` (not `email`)
+-- so the output schema cannot shadow a source column of the same
+-- name.
 create or replace function public.admin_search_users(search text)
 returns table (
   user_id uuid,
-  email text,
+  user_email text,
   handle text,
   created_at timestamptz,
   sessions_count bigint
@@ -626,7 +628,7 @@ begin
   )
   select
     au.id as user_id,
-    au.email as email,
+    au.email as user_email,
     p.handle as handle,
     au.created_at as created_at,
     coalesce(sc.cnt, 0) as sessions_count

@@ -39,7 +39,7 @@ describe('adminUsers lib', () => {
       const payload = [
         {
           user_id: 'u-1',
-          email: 'admin@x.com',
+          user_email: 'admin@x.com',
           handle: 'admin_42',
           created_at: '2025-01-01T00:00:00Z',
           sessions_count: 7,
