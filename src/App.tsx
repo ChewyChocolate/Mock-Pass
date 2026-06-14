@@ -21,6 +21,7 @@ import AdminQuestionsScreen from './screens/AdminQuestionsScreen';
 import { type AdminSectionId } from './components/AdminSidebar';
 import { preloadQuestions } from './hooks/useQuestions';
 import { STORAGE_KEYS } from './lib/storageKeys';
+import { ToastProvider } from './components/Toast';
 import './index.css';
 
 const VALID_SCREENS: ReadonlySet<Screen> = new Set<Screen>([
@@ -213,9 +214,11 @@ export default function App() {
       <AuthProvider>
         <ExamProvider>
           <ErrorBoundary>
-            <div className="min-h-screen bg-surface font-sans text-on-surface antialiased format-selection">
-              <Router />
-            </div>
+            <ToastProvider>
+              <div className="min-h-screen bg-surface font-sans text-on-surface antialiased format-selection">
+                <Router />
+              </div>
+            </ToastProvider>
           </ErrorBoundary>
         </ExamProvider>
       </AuthProvider>

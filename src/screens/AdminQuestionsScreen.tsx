@@ -40,6 +40,7 @@ import {
 } from '../lib/questions';
 import { useQuestionsLoaded } from '../hooks/useQuestions';
 import { formatRelative } from '../utils/format';
+import { useToast } from '../components/Toast';
 
 interface AdminQuestionsScreenProps extends BaseScreenProps {
   onSelectSection?: (id: AdminSectionId) => void;
@@ -63,6 +64,7 @@ export default function AdminQuestionsScreen({
   onSelectSection,
 }: AdminQuestionsScreenProps) {
   const isAdmin = useAdmin();
+  const toast = useToast();
   const { loaded: dbLoaded } = useQuestionsLoaded();
 
   const [section, setSection] = useState<AdminSectionId>('questions');
@@ -73,6 +75,7 @@ export default function AdminQuestionsScreen({
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -202,31 +205,46 @@ export default function AdminQuestionsScreen({
         editing.isNew,
       );
       if (!result.ok) {
-        setEditing((e) =>
-          e ? { ...e, saving: false, saveError: result.error ?? 'Save failed.' } : e,
-        );
+        const msg = result.error ?? 'Save failed.';
+        setEditing((e) => (e ? { ...e, saving: false, saveError: msg } : e));
+        toast.show(`Save failed: ${msg}`, 'error');
         return;
       }
+      toast.show(editing.isNew ? 'Question created.' : 'Question updated.', 'success');
       setEditing(null);
       await refresh();
     } catch (err) {
-      setEditing((e) =>
-        e ? { ...e, saving: false, saveError: err instanceof Error ? err.message : 'Save failed.' } : e,
-      );
+      const msg = err instanceof Error ? err.message : 'Save failed.';
+      setEditing((e) => (e ? { ...e, saving: false, saveError: msg } : e));
+      toast.show(`Save failed: ${msg}`, 'error');
     }
   };
 
   const handleDisableConfirm = async () => {
     if (!pendingDisable) return;
+    const target = pendingDisable;
+    setTogglingId(target.id);
     try {
       const client = getSupabaseClient();
-      const result = await setQuestionActive(client, pendingDisable.id, !pendingDisable.is_active);
+      const result = await setQuestionActive(client, target.id, !target.is_active);
       if (result.ok) {
+        toast.show(
+          target.is_active
+            ? `Disabled ${target.id}. Hidden from the exam screen.`
+            : `Re-enabled ${target.id}. Visible in the exam screen.`,
+          'success',
+        );
         setPendingDisable(null);
         await refresh();
+      } else {
+        toast.show(`Failed to update ${target.id}: ${result.error ?? 'unknown error'}`, 'error');
+        // Leave the dialog open so the admin can retry.
       }
     } catch (err) {
-      console.error('toggle active failed', err);
+      const msg = err instanceof Error ? err.message : 'unknown error';
+      toast.show(`Failed to update ${target.id}: ${msg}`, 'error');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -494,13 +512,17 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                         </button>
                         <button
                           onClick={() => setPendingDisable(q)}
-                          className={`px-3 py-2 rounded text-xs font-bold uppercase tracking-widest transition-all inline-flex items-center gap-1 ${
+                          disabled={togglingId === q.id}
+                          aria-busy={togglingId === q.id}
+                          className={`px-3 py-2 rounded text-xs font-bold uppercase tracking-widest transition-all inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${
                             q.is_active
                               ? 'bg-surface-container-high border border-outline-variant text-on-surface-variant hover:bg-surface-variant'
                               : 'bg-tertiary-container border border-tertiary/40 text-tertiary hover:brightness-110'
                           }`}
                         >
-                          {q.is_active ? (
+                          {togglingId === q.id ? (
+                            <span>{q.is_active ? 'Disabling…' : 'Enabling…'}</span>
+                          ) : q.is_active ? (
                             <>
                               <PowerOff className="w-3 h-3" />
                               Disable
