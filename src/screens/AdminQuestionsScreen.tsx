@@ -33,6 +33,7 @@ import {
   questionsAreFromDb,
   saveQuestion,
   setQuestionActive,
+  createNewQuestionId,
   type AdminQuestion,
   type SaveQuestionInput,
 } from '../lib/questions';
@@ -189,14 +190,12 @@ export default function AdminQuestionsScreen({
         client,
         {
           ...v,
-          // Auto-generate id for new questions: q-{timestamp}-{level short code}-{rand}
-          id: editing.isNew
-            ? `q-${Date.now()}-${v.level === 'professional' ? 'p' : 's'}-${Math.floor(
-                Math.random() * 1000,
-              )
-                .toString()
-                .padStart(3, '0')}`
-            : v.id,
+          // Auto-generate id for new admin-authored questions. The
+          // q-adm-* namespace is clearly separate from the bundled
+          // q-001..q-150 ids, and the 12-hex-char suffix is enough
+          // to make collisions astronomically unlikely. saveQuestion
+          // retries once on a PK collision as a safety net.
+          id: editing.isNew ? createNewQuestionId() : v.id,
         },
         editing.isNew,
       );

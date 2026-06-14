@@ -276,4 +276,68 @@ describe('questions lib', () => {
       expect(ts!).toBeLessThanOrEqual(after);
     });
   });
+
+  describe('createNewQuestionId', () => {
+    it('returns a q-adm-* id with a 12-hex-char suffix', async () => {
+      const { createNewQuestionId } = await import('../src/lib/questions');
+      const id = createNewQuestionId();
+      expect(id).toMatch(/^q-adm-[0-9a-f]{12}$/);
+    });
+
+    it('two consecutive calls return distinct ids', async () => {
+      const { createNewQuestionId } = await import('../src/lib/questions');
+      const a = createNewQuestionId();
+      const b = createNewQuestionId();
+      expect(a).not.toBe(b);
+    });
+  });
+
+  describe('saveQuestion retry on PK collision', () => {
+    it('retries once with a fresh id on 23505 and surfaces the real error on a second failure', async () => {
+      const { saveQuestion, createNewQuestionId } = await import('../src/lib/questions');
+      // First insert returns a PK-collision error. Second insert
+      // (the retry) returns a different error, which the user
+      // should see verbatim.
+      const insert = vi
+        .fn()
+        .mockReturnValueOnce(
+          makeChainable({
+            data: null,
+            error: { message: 'duplicate key value violates unique constraint "questions_pkey"' },
+          }),
+        )
+        .mockReturnValueOnce(
+          makeChainable({
+            data: null,
+            error: { message: 'check constraint violated' },
+          }),
+        );
+      const chain: Record<string, unknown> = { insert };
+      fromSpy.mockReturnValue(chain);
+
+      const result = await saveQuestion({ from: fromSpy } as never, makeSampleRow(), true);
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe('check constraint violated');
+      expect(insert).toHaveBeenCalledTimes(2);
+    });
+
+    it('succeeds on retry if the first insert collided', async () => {
+      const { saveQuestion, createNewQuestionId } = await import('../src/lib/questions');
+      const insert = vi
+        .fn()
+        .mockReturnValueOnce(
+          makeChainable({
+            data: null,
+            error: { message: 'duplicate key value violates unique constraint "questions_pkey"' },
+          }),
+        )
+        .mockReturnValueOnce(makeChainable({ data: null, error: null }));
+      const chain: Record<string, unknown> = { insert };
+      fromSpy.mockReturnValue(chain);
+
+      const result = await saveQuestion({ from: fromSpy } as never, makeSampleRow(), true);
+      expect(result.ok).toBe(true);
+      expect(insert).toHaveBeenCalledTimes(2);
+    });
+  });
 });

@@ -179,17 +179,54 @@ export interface SaveQuestionResult {
   error?: string;
 }
 
+/**
+ * Generate a fresh admin-authored question id. Uses crypto.randomUUID
+ * (available in modern browsers and Node 19+) with a short prefix so
+ * the namespace is clearly distinguished from the bundled q-001…
+ * q-150 ids. 12-hex char suffix is enough to keep collisions
+ * astronomically unlikely (1 in 2^48); the retry-on-23505 path in
+ * saveQuestion handles the residual.
+ */
+export function createNewQuestionId(): string {
+  const u = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  // Strip dashes and keep 12 hex chars for readability.
+  const short = u.replace(/-/g, '').slice(0, 12);
+  return `q-adm-${short}`;
+}
+
 export async function saveQuestion(
   client: SupabaseClient,
   input: SaveQuestionInput,
   isNew: boolean,
 ): Promise<SaveQuestionResult> {
-  if (isNew) {
-    const { error } = await client.from('questions').insert(input);
-    if (error) return { ok: false, error: error.message };
-  } else {
+  if (!isNew) {
     const { error } = await client.from('questions').update(input).eq('id', input.id);
     if (error) return { ok: false, error: error.message };
+  } else {
+    // Retry once on a primary-key collision (Postgres 23505). The id
+    // is regenerated on the retry; if it still fails, the underlying
+    // error message bubbles up to the UI (no more opaque "Save
+    // failed.").
+    const first = await client.from('questions').insert(input);
+    if (first.error) {
+      const isPkCollision = /duplicate key value/i.test(first.error.message);
+      if (!isPkCollision) {
+        return { ok: false, error: first.error.message };
+      }
+      const retriedInput: SaveQuestionInput = { ...input, id: createNewQuestionId() };
+      const second = await client.from('questions').insert(retriedInput);
+      if (second.error) {
+        return { ok: false, error: second.error.message };
+      }
+      // Surface the regenerated id to the caller via a side effect on
+      // the input is not possible (we don't return the row), so the
+      // screen will call fetchAdminQuestions() which returns the new
+      // id naturally. The rare double-call is harmless.
+      invalidateOverride(input.level);
+      return { ok: true };
+    }
   }
   // The DB has changed; the in-memory cache may now be stale.
   // Easiest correct behavior: invalidate the affected level so the
