@@ -104,3 +104,32 @@ drop trigger if exists questions_touch_updated_at on public.questions;
 create trigger questions_touch_updated_at
   before update on public.questions
   for each row execute function public.touch_updated_at();
+
+-- Hard-delete guard. Admins can disable a question (is_active=false)
+-- but cannot DELETE a row outright. This prevents an in-flight exam
+-- in some other browser from suddenly losing a question mid-session,
+-- and it keeps the audit trail clean (every question ever shipped is
+-- still in the table, marked inactive). If a question is genuinely
+-- broken, disable it; if a question must be removed, the admin can
+-- override the guard from psql/Supabase Studio with:
+--   alter table public.questions disable trigger questions_block_active_delete;
+--   delete from public.questions where id = '...';
+--   alter table public.questions enable trigger questions_block_active_delete;
+create or replace function public.questions_block_active_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.is_active then
+    raise exception
+      'cannot delete active question %; disable it first (set is_active=false)', old.id
+      using errcode = '23514';
+  end if;
+  return old;
+end;
+$$;
+
+drop trigger if exists questions_block_active_delete on public.questions;
+create trigger questions_block_active_delete
+  before delete on public.questions
+  for each row execute function public.questions_block_active_delete();
