@@ -10,6 +10,9 @@ export const STORAGE_KEYS = {
   examLegacy: 'mockpass:exam:v1',
   /** Supabase auth session storage (consumed by @supabase/supabase-js). */
   supabaseAuth: 'mockpass:supabase-auth',
+  /** Last-viewed screen. Restored on hard refresh so the user lands
+   *  where they left off. Cleared on sign-out. */
+  screen: 'mockpass:screen',
   /** User-selected theme. */
   theme: 'mockpass:theme',
 } as const;

@@ -153,7 +153,9 @@ async function ensureProfileRow(
 export function AuthProvider({ children }: { children: ReactNode }) {
   const configured = isSupabaseConfigured();
   const [state, setState] = useState<AuthState>(() =>
-    configured ? buildInitialAuthState(true, null) : initialUnconfigured,
+    configured
+      ? { ...initialUnconfigured, status: 'loading' }
+      : initialUnconfigured,
   );
 
   const clientRef = useRef<ReturnType<typeof getSupabaseClient> | null>(null);

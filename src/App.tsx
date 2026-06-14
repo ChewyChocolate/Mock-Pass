@@ -20,7 +20,46 @@ import AdminUsersScreen from './screens/AdminUsersScreen';
 import AdminQuestionsScreen from './screens/AdminQuestionsScreen';
 import { type AdminSectionId } from './components/AdminSidebar';
 import { preloadQuestions } from './hooks/useQuestions';
+import { STORAGE_KEYS } from './lib/storageKeys';
 import './index.css';
+
+const VALID_SCREENS: ReadonlySet<Screen> = new Set<Screen>([
+  'login',
+  'dashboard',
+  'review',
+  'exam',
+  'performance',
+  'support',
+  'profile',
+  'leaderboard',
+  'admin',
+]);
+
+function readPersistedScreen(): Screen {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.screen);
+    if (raw && (VALID_SCREENS as ReadonlySet<string>).has(raw)) {
+      return raw as Screen;
+    }
+  } catch {
+    // localStorage may be disabled (private mode, sandboxed iframe);
+    // fall through to the default.
+  }
+  return 'login';
+}
+
+function writePersistedScreen(screen: Screen): void {
+  try {
+    if (screen === 'login') {
+      localStorage.removeItem(STORAGE_KEYS.screen);
+    } else {
+      localStorage.setItem(STORAGE_KEYS.screen, screen);
+    }
+  } catch {
+    // Best effort. If localStorage is unavailable the in-memory
+    // currentScreen still works for the current page life.
+  }
+}
 
 function AdminRouter({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const [section, setSection] = useState<AdminSectionId>('seasons');
@@ -65,12 +104,21 @@ function AdminRouter({ onNavigate }: { onNavigate: (s: Screen) => void }) {
 }
 
 function Router() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
+  const [currentScreen, setCurrentScreenState] = useState<Screen>(() => readPersistedScreen());
   const { state } = useExam();
   const { isSignedIn, isLoading, recoveryMode } = useAuth();
   const initialized = useRef(false);
   const prevStatus = useRef(state.status);
-  const prevSignedIn = useRef<boolean | null>(null);
+
+  // Wrapper that writes the new screen to localStorage so a hard
+  // refresh (or a tab restore) returns the user to the same place.
+  // The 'login' screen is intentionally NOT persisted; a sign-out
+  // clears the saved value so a logged-out user always lands on
+  // login after a refresh.
+  const setCurrentScreen = (screen: Screen) => {
+    setCurrentScreenState(screen);
+    writePersistedScreen(screen);
+  };
 
   // Preload the question bank from the DB so admin edits are live
   // without requiring a redeploy. Idempotent; safe to call on every
@@ -95,12 +143,13 @@ function Router() {
     prevStatus.current = state.status;
   }, [state.status]);
 
+  // Once auth loading finishes, force-redirect to login if the user
+  // is signed out. This handles two cases:
+  //   1. Cold start with a stale or missing persisted screen.
+  //   2. The sign-out flow itself (signed-in -> signed-out transition).
   useEffect(() => {
     if (isLoading) return;
-    const wasSignedIn = prevSignedIn.current;
-    prevSignedIn.current = isSignedIn;
-    if (wasSignedIn === null) return;
-    if (wasSignedIn && !isSignedIn) {
+    if (!isSignedIn) {
       setCurrentScreen('login');
     }
   }, [isSignedIn, isLoading]);
