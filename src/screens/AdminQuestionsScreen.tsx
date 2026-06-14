@@ -31,6 +31,7 @@ import { getSupabaseClient } from '../lib/supabase';
 import {
   fetchAdminQuestions,
   questionsAreFromDb,
+  getQuestionsCacheTimestamp,
   saveQuestion,
   setQuestionActive,
   createNewQuestionId,
@@ -38,6 +39,7 @@ import {
   type SaveQuestionInput,
 } from '../lib/questions';
 import { useQuestionsLoaded } from '../hooks/useQuestions';
+import { formatRelative } from '../utils/format';
 
 interface AdminQuestionsScreenProps extends BaseScreenProps {
   onSelectSection?: (id: AdminSectionId) => void;
@@ -228,6 +230,46 @@ export default function AdminQuestionsScreen({
     }
   };
 
+function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boolean }) {
+  if (!dbLoaded) {
+    return (
+      <span
+        title="Loading the question bank from Supabase…"
+        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant border border-outline-variant/40 bg-surface-container/40 px-2 py-0.5 rounded-sm"
+      >
+        <Database className="w-3 h-3" />
+        Loading…
+      </span>
+    );
+  }
+  if (!questionsAreFromDb(level)) {
+    return (
+      <span
+        title="DB returned zero active rows for this level. The bundled JS questions are being served."
+        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant border border-outline-variant/40 bg-surface-container/40 px-2 py-0.5 rounded-sm"
+      >
+        <Database className="w-3 h-3" />
+        Bundle
+      </span>
+    );
+  }
+  const ts = getQuestionsCacheTimestamp(level);
+  const label = ts ? formatRelative(ts) : 'just now';
+  return (
+    <span
+      title={
+        ts
+          ? `Last refreshed ${new Date(ts).toLocaleString()}`
+          : 'Cache populated but no timestamp recorded.'
+      }
+      className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-tertiary border border-tertiary/40 bg-tertiary-container/20 px-2 py-0.5 rounded-sm"
+    >
+      <Database className="w-3 h-3" />
+      DB · {label}
+    </span>
+  );
+}
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-surface text-on-surface font-sans flex items-center justify-center p-6">
@@ -260,15 +302,7 @@ export default function AdminQuestionsScreen({
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            {dbLoaded && questionsAreFromDb(filter.level) && (
-              <span
-                title="Question bank loaded from Supabase"
-                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-tertiary border border-tertiary/40 bg-tertiary-container/20 px-2 py-0.5 rounded-sm"
-              >
-                <Database className="w-3 h-3" />
-                DB-backed
-              </span>
-            )}
+            <CacheStatusBadge level={filter.level} dbLoaded={dbLoaded} />
             <button
               onClick={refresh}
               aria-label="Refresh"

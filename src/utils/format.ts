@@ -71,3 +71,23 @@ export function formatDurationLong(seconds: number): string {
 export function formatHours(totalSeconds: number): string {
   return `${(totalSeconds / 3600).toFixed(1)}h`;
 }
+
+/**
+ * Format a past wall-clock timestamp as a short relative phrase
+ * ("just now", "2 min ago", "1 h ago", "3 d ago"). For anything
+ * older than 7 days, falls back to a date string.
+ */
+export function formatRelative(
+  pastMs: number,
+  nowMs: number = Date.now(),
+): string {
+  const diffSec = Math.max(0, Math.floor((nowMs - pastMs) / 1000));
+  if (diffSec < 45) return 'just now';
+  if (diffSec < 90) return '1 min ago';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min ago`;
+  if (diffSec < 5400) return '1 h ago';
+  if (diffSec < 86_400) return `${Math.floor(diffSec / 3600)} h ago`;
+  if (diffSec < 172_800) return '1 d ago';
+  if (diffSec < 7 * 86_400) return `${Math.floor(diffSec / 86_400)} d ago`;
+  return formatDate(pastMs, { includeYear: true });
+}

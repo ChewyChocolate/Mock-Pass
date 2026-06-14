@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatDurationLong,
   formatHours,
+  formatRelative,
   formatTime,
 } from '../src/utils/format';
 
@@ -66,5 +67,37 @@ describe('formatHours', () => {
     expect(formatHours(3600)).toBe('1.0h');
     expect(formatHours(5400)).toBe('1.5h');
     expect(formatHours(1800)).toBe('0.5h');
+  });
+});
+
+describe('formatRelative', () => {
+  const NOW = 1_700_000_000_000;
+  it('returns "just now" for under 45 seconds', () => {
+    expect(formatRelative(NOW - 10_000, NOW)).toBe('just now');
+    expect(formatRelative(NOW - 44_000, NOW)).toBe('just now');
+  });
+  it('returns "1 min ago" for 45-89 seconds', () => {
+    expect(formatRelative(NOW - 60_000, NOW)).toBe('1 min ago');
+  });
+  it('returns N min ago for 90s-59m', () => {
+    expect(formatRelative(NOW - 5 * 60_000, NOW)).toBe('5 min ago');
+  });
+  it('returns "1 h ago" for 60-89 minutes', () => {
+    expect(formatRelative(NOW - 70 * 60_000, NOW)).toBe('1 h ago');
+  });
+  it('returns N h ago for 90m-23h', () => {
+    expect(formatRelative(NOW - 5 * 3600_000, NOW)).toBe('5 h ago');
+  });
+  it('returns "1 d ago" for 1 day, N d ago for 2-6 days', () => {
+    expect(formatRelative(NOW - 86_400_000, NOW)).toBe('1 d ago');
+    expect(formatRelative(NOW - 3 * 86_400_000, NOW)).toBe('3 d ago');
+  });
+  it('falls back to formatDate for >= 7 days', () => {
+    const result = formatRelative(NOW - 30 * 86_400_000, NOW);
+    // Just check it doesn't match any of the relative phrases.
+    expect(result).not.toMatch(/ago$/);
+  });
+  it('clamps future timestamps to "just now"', () => {
+    expect(formatRelative(NOW + 60_000, NOW)).toBe('just now');
   });
 });
