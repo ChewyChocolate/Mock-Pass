@@ -606,9 +606,14 @@ create trigger support_tickets_touch_updated_at
 -- change the return type of an existing function via CREATE OR REPLACE;
 -- the explicit DROP makes the script idempotent across first-run and
 -- rerun. (drop function ... if exists is also safe if the function
--- doesn't exist yet.)
+-- doesn't exist yet.) Use CREATE FUNCTION (not OR REPLACE) after the
+-- drop so the row type is fully fresh and the planner cannot cache an
+-- old definition. Cast every output column explicitly to lock the
+-- types to the RETURNS TABLE declaration; if a source column is ever
+-- altered (e.g. profiles.handle switched to citext), the cast here
+-- will catch it instead of producing a 42804 on the first call.
 drop function if exists public.admin_search_users(text);
-create or replace function public.admin_search_users(search text)
+create function public.admin_search_users(search text)
 returns table (
   user_id uuid,
   user_email text,
@@ -635,11 +640,11 @@ begin
     group by es.user_id
   )
   select
-    au.id as user_id,
-    au.email as user_email,
-    p.handle as handle,
-    au.created_at as created_at,
-    coalesce(sc.cnt, 0) as sessions_count
+    au.id::uuid                              as user_id,
+    au.email::text                           as user_email,
+    p.handle::text                           as handle,
+    au.created_at::timestamptz               as created_at,
+    coalesce(sc.cnt, 0)::bigint              as sessions_count
   from auth.users au
   left join public.profiles p on p.user_id = au.id
   left join session_counts sc on sc.user_id = au.id
