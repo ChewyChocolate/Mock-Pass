@@ -82,6 +82,7 @@ export default function AdminQuestionsScreen({
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<'active' | 'disabled' | 'all'>('active');
+  const [searchAllTopics, setSearchAllTopics] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -110,10 +111,18 @@ export default function AdminQuestionsScreen({
     setError(null);
     try {
       const client = getSupabaseClient();
+      const trimmedSearch = debouncedSearch.trim();
+      // When "search all topics" is on AND the user has typed a
+      // query, send the search to Supabase and ignore the
+      // level/topic filters (so q-073 in Numerical shows up while
+      // the user is browsing Verbal). When the search box is
+      // empty, fall back to the level+topic filters as before.
+      const useServerSearch = searchAllTopics && trimmedSearch.length > 0;
       const result = await fetchAdminQuestions(client, {
-        level: filter.level,
-        topic: filter.topic,
+        level: useServerSearch ? undefined : filter.level,
+        topic: useServerSearch ? undefined : filter.topic,
         isActive: activeFilter === 'all' ? undefined : activeFilter === 'active',
+        search: useServerSearch ? trimmedSearch : undefined,
       });
       if (myToken !== refreshTokenRef.current) return; // superseded
       if (!result.ok) {
@@ -133,10 +142,13 @@ export default function AdminQuestionsScreen({
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, filter.level, filter.topic, activeFilter, dbLoaded]);
+  }, [isAdmin, filter.level, filter.topic, activeFilter, searchAllTopics, debouncedSearch, dbLoaded]);
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
+    // When server-side search is active, the rows are already
+    // filtered by Supabase; we just pass them through.
+    if (searchAllTopics && q) return questions;
     if (!q) return questions;
     return questions.filter(
       (x) =>
@@ -144,7 +156,7 @@ export default function AdminQuestionsScreen({
         x.prompt.toLowerCase().includes(q) ||
         x.topic.toLowerCase().includes(q),
     );
-  }, [questions, debouncedSearch]);
+  }, [questions, debouncedSearch, searchAllTopics]);
 
   const openNew = () => {
     setEditing({
@@ -430,6 +442,20 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                 className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm"
               />
             </div>
+
+            <label
+              className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-on-surface-variant cursor-pointer self-start"
+              title="When on, the search box queries every topic and level; the level and topic filters are ignored."
+            >
+              <input
+                type="checkbox"
+                checked={searchAllTopics}
+                onChange={(e) => setSearchAllTopics(e.target.checked)}
+                aria-label="Search across all topics and levels"
+                className="w-4 h-4"
+              />
+              Search all topics
+            </label>
           </div>
         </SectionCard>
 

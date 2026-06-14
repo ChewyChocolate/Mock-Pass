@@ -152,12 +152,29 @@ export interface FetchAdminQuestionsResult {
 
 export async function fetchAdminQuestions(
   client: SupabaseClient,
-  filter?: { level?: ExamLevel; topic?: string; isActive?: boolean },
+  filter?: {
+    level?: ExamLevel;
+    topic?: string;
+    isActive?: boolean;
+    search?: string;
+  },
 ): Promise<FetchAdminQuestionsResult> {
   let query = client.from('questions').select('*').order('id');
   if (filter?.level) query = query.eq('level', filter.level);
   if (filter?.topic) query = query.eq('topic', filter.topic);
   if (filter?.isActive !== undefined) query = query.eq('is_active', filter.isActive);
+  // Search-across-topics: PostgREST or() lets us match the search
+  // text against id OR prompt in a single round-trip. The .ilike
+  // operator is case-insensitive; we escape % and _ in the search
+  // text so a literal underscore doesn't act as a wildcard.
+  if (filter?.search) {
+    const safe = filter.search
+      .replace(/\\/g, '\\\\')
+      .replace(/%/g, '\\%')
+      .replace(/_/g, '\\_');
+    const needle = `%${safe}%`;
+    query = query.or(`id.ilike.${needle},prompt.ilike.${needle}`);
+  }
   const { data, error } = await query;
   if (error) return { ok: false, questions: [], error: error.message };
   return { ok: true, questions: (data ?? []) as AdminQuestion[] };

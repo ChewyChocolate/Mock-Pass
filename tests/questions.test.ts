@@ -136,6 +136,56 @@ describe('questions lib', () => {
       expect(result.ok).toBe(true);
       expect(result.questions).toEqual(payload);
     });
+
+    it('uses server-side ilike when search is provided', async () => {
+      const orSpy = vi.fn(() => makeChainable({ data: [], error: null }));
+      const eqSpy = vi.fn(() => ({ or: orSpy }));
+      const chain: Record<string, unknown> = {
+        select: vi.fn(() => chain),
+        order: vi.fn(() => chain),
+        eq: eqSpy,
+        or: orSpy,
+      };
+      fromSpy.mockReturnValue(chain);
+      await fetchAdminQuestions({ from: fromSpy } as never, {
+        level: 'professional',
+        search: 'q-073',
+      });
+      expect(orSpy).toHaveBeenCalledTimes(1);
+      const arg = orSpy.mock.calls[0][0] as string;
+      expect(arg).toContain('id.ilike.%q-073%');
+      expect(arg).toContain('prompt.ilike.%q-073%');
+    });
+
+    it('escapes LIKE wildcards in the search text', async () => {
+      const orSpy = vi.fn(() => makeChainable({ data: [], error: null }));
+      const chain: Record<string, unknown> = {
+        select: vi.fn(() => chain),
+        order: vi.fn(() => chain),
+        eq: vi.fn(() => ({ or: orSpy })),
+        or: orSpy,
+      };
+      fromSpy.mockReturnValue(chain);
+      await fetchAdminQuestions({ from: fromSpy } as never, { search: '100%' });
+      const arg = orSpy.mock.calls[0][0] as string;
+      // The % and _ in the user's input must be escaped so they're
+      // treated as literals, not wildcards.
+      expect(arg).toContain('%100\\%%');
+      expect(arg).not.toMatch(/%[^\\]%/); // no double-unescaped %%
+    });
+
+    it('does not call .or() when search is empty', async () => {
+      const orSpy = vi.fn(() => makeChainable({ data: [], error: null }));
+      const chain: Record<string, unknown> = {
+        select: vi.fn(() => chain),
+        order: vi.fn(() => chain),
+        eq: vi.fn(() => ({ or: orSpy })),
+        or: orSpy,
+      };
+      fromSpy.mockReturnValue(chain);
+      await fetchAdminQuestions({ from: fromSpy } as never, { search: '' });
+      expect(orSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('saveQuestion', () => {
