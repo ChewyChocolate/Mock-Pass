@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   MessageSquare,
@@ -66,6 +66,11 @@ export default function AdminQuestionsScreen({
   const isAdmin = useAdmin();
   const toast = useToast();
   const { loaded: dbLoaded } = useQuestionsLoaded();
+  // Monotonic request token. Each refresh() invocation captures the
+  // current value; the resolved promise only writes state if its
+  // captured token is still the latest, so a stale response cannot
+  // clobber a fresher one.
+  const refreshTokenRef = useRef(0);
 
   const [section, setSection] = useState<AdminSectionId>('questions');
   const [filter, setFilter] = useState<{ level: ExamLevel; topic: QuestionTopic }>({
@@ -99,6 +104,7 @@ export default function AdminQuestionsScreen({
 
   const refresh = async () => {
     if (!isAdmin) return;
+    const myToken = ++refreshTokenRef.current;
     setStatus('loading');
     setError(null);
     try {
@@ -107,6 +113,7 @@ export default function AdminQuestionsScreen({
         level: filter.level,
         topic: filter.topic,
       });
+      if (myToken !== refreshTokenRef.current) return; // superseded
       if (!result.ok) {
         setError(result.error ?? 'Failed to load questions.');
         setStatus('error');
@@ -115,6 +122,7 @@ export default function AdminQuestionsScreen({
       setQuestions(result.questions);
       setStatus('ready');
     } catch (err) {
+      if (myToken !== refreshTokenRef.current) return; // superseded
       setError(err instanceof Error ? err.message : 'Failed to load questions.');
       setStatus('error');
     }
@@ -323,11 +331,15 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
             <CacheStatusBadge level={filter.level} dbLoaded={dbLoaded} />
             <button
               onClick={refresh}
+              disabled={status === 'loading'}
+              aria-busy={status === 'loading'}
               aria-label="Refresh"
-              className="bg-surface-container-high border border-outline-variant text-on-surface px-3 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-surface-variant transition-all inline-flex items-center gap-1"
+              className="bg-surface-container-high border border-outline-variant text-on-surface px-3 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-surface-variant transition-all inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
+              <RefreshCw
+                className={`w-4 h-4 ${status === 'loading' ? 'animate-spin' : ''}`}
+              />
+              {status === 'loading' ? 'Refreshing…' : 'Refresh'}
             </button>
             <button
               onClick={openNew}
