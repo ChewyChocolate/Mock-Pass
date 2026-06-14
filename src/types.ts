@@ -96,6 +96,22 @@ export const PROFESSIONAL_TOPIC_IDS: QuestionTopicId[] = [
   'General Information',
 ];
 
+/**
+ * Canonical list of topics per exam level. Single source of truth for
+ * filter dropdowns, edit forms, and the DB CHECK constraint in
+ * supabase/questions.sql. Keep this in sync with the CHECK list;
+ * tests assert the SQL contains exactly these values.
+ */
+export const QUESTION_TOPICS_BY_LEVEL: Record<ExamLevel, readonly QuestionTopic[]> = {
+  professional: [
+    'Verbal Ability',
+    'Analytical Reasoning',
+    'Numerical Ability',
+    'General Information',
+  ],
+  'sub-professional': ['Verbal Ability', 'Numerical Ability', 'Clerical Ability'],
+} as const;
+
 export interface LeaderboardEntry {
   user_id: string;
   handle: string;

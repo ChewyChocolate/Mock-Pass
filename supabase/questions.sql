@@ -6,11 +6,33 @@
 -- the admin console can edit questions in-browser. After running this
 -- file, run `migrations/migrate-questions-to-db.ts` once (or paste the
 -- generated INSERTs) to populate the table from the current JS bundle.
+--
+-- Idempotency: the topic CHECK is dropped above so re-runs pick up
+-- any change to the canonical topic list. The `options` shape CHECK
+-- is created on first CREATE TABLE; on a re-run the table already
+-- exists, so the CHECK is not re-applied. If you change the options
+-- shape, drop the constraint manually first:
+--   alter table public.questions drop constraint if exists questions_options_shape;
+
+-- Drop the existing topic CHECK constraint (if any) so the inline
+-- CHECK on the topic column can be (re)created idempotently. The
+-- constraint is anonymous (no name given inline) so Postgres
+-- auto-names it `questions_topic_check`. Drop by that name; if the
+-- constraint was never created (fresh DB), the IF EXISTS makes the
+-- drop a no-op.
+alter table if exists public.questions
+  drop constraint if exists questions_topic_check;
 
 create table if not exists public.questions (
   id                text primary key,
   level             text not null check (level in ('sub-professional', 'professional')),
-  topic             text not null,
+  topic             text not null check (topic in (
+                      'Verbal Ability',
+                      'Analytical Reasoning',
+                      'Numerical Ability',
+                      'General Information',
+                      'Clerical Ability'
+                    )),
   prompt            text not null check (length(prompt) between 10 and 4000),
   options           jsonb not null,
   correct_option_id  text not null check (correct_option_id in ('A', 'B', 'C', 'D')),
@@ -23,6 +45,14 @@ create table if not exists public.questions (
                       jsonb_typeof(options) = 'object'
                       and options ? 'A' and options ? 'B'
                       and options ? 'C' and options ? 'D'
+                      and jsonb_typeof(options->'A') = 'string'
+                      and jsonb_typeof(options->'B') = 'string'
+                      and jsonb_typeof(options->'C') = 'string'
+                      and jsonb_typeof(options->'D') = 'string'
+                      and length(options->>'A') between 1 and 1000
+                      and length(options->>'B') between 1 and 1000
+                      and length(options->>'C') between 1 and 1000
+                      and length(options->>'D') between 1 and 1000
                     )
 );
 

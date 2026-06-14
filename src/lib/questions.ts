@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ExamLevel, Question } from '../types';
+import type { ExamLevel, Question, QuestionTopic } from '../types';
 import PROFESSIONAL_QUESTIONS from '../data/questions/professionalQuestions';
 import SUB_PROFESSIONAL_QUESTIONS from '../data/questions/subProfessionalQuestions';
 
@@ -13,7 +13,7 @@ import SUB_PROFESSIONAL_QUESTIONS from '../data/questions/subProfessionalQuestio
 export interface QuestionRow {
   id: string;
   level: ExamLevel;
-  topic: string;
+  topic: QuestionTopic;
   prompt: string;
   options: { A: string; B: string; C: string; D: string };
   correct_option_id: 'A' | 'B' | 'C' | 'D';
@@ -30,7 +30,7 @@ function rowsToQuestions(rows: QuestionRow[]): Question[] {
   return rows.map((r) => ({
     id: r.id,
     level: r.level,
-    topic: r.topic as Question['topic'],
+    topic: r.topic,
     prompt: r.prompt,
     options: [
       { id: 'A', text: r.options.A },
@@ -136,7 +136,7 @@ export function getQuestionsCacheTimestamp(level: ExamLevel): number | null {
 export interface AdminQuestion {
   id: string;
   level: ExamLevel;
-  topic: string;
+  topic: QuestionTopic;
   prompt: string;
   options: { A: string; B: string; C: string; D: string };
   correct_option_id: 'A' | 'B' | 'C' | 'D';
@@ -166,7 +166,7 @@ export async function fetchAdminQuestions(
 export interface SaveQuestionInput {
   id: string;
   level: ExamLevel;
-  topic: string;
+  topic: QuestionTopic;
   prompt: string;
   options: { A: string; B: string; C: string; D: string };
   correct_option_id: 'A' | 'B' | 'C' | 'D';

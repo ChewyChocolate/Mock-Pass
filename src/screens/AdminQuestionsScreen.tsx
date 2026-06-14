@@ -17,7 +17,9 @@ import {
 import {
   BaseScreenProps,
   TOPIC_SHORT_LABELS,
+  QUESTION_TOPICS_BY_LEVEL,
   type ExamLevel,
+  type QuestionTopic,
 } from '../types';
 import { AdminLayout, type AdminSectionId } from '../components/AdminLayout';
 import { SectionCard } from '../components/SectionCard';
@@ -40,13 +42,6 @@ interface AdminQuestionsScreenProps extends BaseScreenProps {
   onSelectSection?: (id: AdminSectionId) => void;
 }
 
-const PROFESSIONAL_TOPICS = [
-  'Verbal Ability',
-  'Analytical Reasoning',
-  'Numerical Ability',
-  'General Information',
-];
-
 function defaultFormValues(): SaveQuestionInput {
   return {
     id: '',
@@ -68,7 +63,7 @@ export default function AdminQuestionsScreen({
   const { loaded: dbLoaded } = useQuestionsLoaded();
 
   const [section, setSection] = useState<AdminSectionId>('questions');
-  const [filter, setFilter] = useState<{ level: ExamLevel; topic: string }>({
+  const [filter, setFilter] = useState<{ level: ExamLevel; topic: QuestionTopic }>({
     level: 'professional',
     topic: 'Verbal Ability',
   });
@@ -314,15 +309,14 @@ export default function AdminQuestionsScreen({
 
             <select
               value={filter.topic}
-              onChange={(e) => setFilter((f) => ({ ...f, topic: e.target.value }))}
+              onChange={(e) =>
+                setFilter((f) => ({ ...f, topic: e.target.value as QuestionTopic }))
+              }
               className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm"
             >
-              {(filter.level === 'professional'
-                ? PROFESSIONAL_TOPICS
-                : ['Verbal Ability', 'Numerical Ability', 'Clerical Ability']
-              ).map((t) => (
+              {QUESTION_TOPICS_BY_LEVEL[filter.level].map((t) => (
                 <option key={t} value={t}>
-                  {TOPIC_SHORT_LABELS[t as keyof typeof TOPIC_SHORT_LABELS] ?? t}
+                  {TOPIC_SHORT_LABELS[t] ?? t}
                 </option>
               ))}
             </select>
@@ -544,17 +538,19 @@ export default function AdminQuestionsScreen({
                   value={editing.values.topic}
                   onChange={(e) =>
                     setEditing((s) =>
-                      s ? { ...s, values: { ...s.values, topic: e.target.value } } : s,
+                      s
+                        ? {
+                            ...s,
+                            values: { ...s.values, topic: e.target.value as QuestionTopic },
+                          }
+                        : s,
                     )
                   }
                   className="w-full mt-1 bg-surface-container-low border border-outline-variant rounded px-3 py-2 text-on-surface"
                 >
-                  {(editing.values.level === 'professional'
-                    ? PROFESSIONAL_TOPICS
-                    : ['Verbal Ability', 'Numerical Ability', 'Clerical Ability']
-                  ).map((t) => (
+                  {QUESTION_TOPICS_BY_LEVEL[editing.values.level].map((t) => (
                     <option key={t} value={t}>
-                      {t}
+                      {TOPIC_SHORT_LABELS[t] ?? t}
                     </option>
                   ))}
                 </select>

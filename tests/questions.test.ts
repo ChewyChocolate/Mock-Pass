@@ -47,7 +47,7 @@ function makeSampleRow(overrides: Partial<{ id: string; level: 'professional' | 
   return {
     id: overrides.id ?? 'q-test-1',
     level: overrides.level ?? 'professional',
-    topic: 'Verbal Ability',
+    topic: 'Verbal Ability' as const,
     prompt: 'What is the largest island in the Philippines?',
     options: { A: 'Luzon', B: 'Mindanao', C: 'Palawan', D: 'Visayas' },
     correct_option_id: 'A' as const,
