@@ -38,6 +38,7 @@ function makeChainable(result: { data: unknown; error: unknown }) {
   chain.update = vi.fn(() => chain);
   chain.eq = vi.fn(() => chain);
   chain.order = vi.fn(() => chain);
+  chain.maybeSingle = vi.fn(() => Promise.resolve(result));
   chain.then = (resolve: (v: unknown) => void) => resolve(result);
   return chain;
 }
@@ -175,13 +176,104 @@ describe('questions lib', () => {
   });
 
   describe('setQuestionActive', () => {
-    it('patches is_active', async () => {
+    it('patches is_active and looks up the level first', async () => {
       const update = vi.fn(() => makeChainable({ data: null, error: null }));
-      const chain: Record<string, unknown> = { update };
+      const chain: Record<string, unknown> = {
+        select: vi.fn(() => makeChainable({ data: { level: 'professional' }, error: null })),
+        update,
+        eq: vi.fn(() => chain),
+      };
       fromSpy.mockReturnValue(chain);
       const result = await setQuestionActive({ from: fromSpy } as never, 'q-1', false);
       expect(result.ok).toBe(true);
       expect(update).toHaveBeenCalledWith({ is_active: false });
+    });
+  });
+
+  describe('cache invalidation on save', () => {
+    it('saveQuestion invalidates the affected level so the next getQuestionsForLevel falls back to the bundle', async () => {
+      // 1. Populate the cache via refresh (active rows for professional).
+      const refreshChain = makeChainable({
+        data: [makeSampleRow({ id: 'q-cached' })],
+        error: null,
+      });
+      fromSpy.mockReturnValue(refreshChain);
+      await refreshQuestionsFromDb({ from: fromSpy } as never);
+      expect(questionsAreFromDb('professional')).toBe(true);
+
+      // 2. Now save a question on the professional level. The mock
+      //    only needs to return ok; the .eq().maybeSingle path is
+      //    not exercised by saveQuestion, so the simple chain is
+      //    enough for both insert and update branches.
+      const saveChain = makeChainable({ data: null, error: null });
+      fromSpy.mockReturnValue(saveChain);
+      const input = makeSampleRow();
+      const result = await saveQuestion({ from: fromSpy } as never, input, false);
+      expect(result.ok).toBe(true);
+
+      // 3. The cache for professional should be invalidated, and the
+      //    bundled questions should be served again. The other level
+      //    (sub-professional) was also touched by the refresh above,
+      //    but only the affected level is invalidated by saveQuestion.
+      expect(questionsAreFromDb('professional')).toBe(false);
+      // The bundle has 150 pro questions; if the cache were still
+      // active we'd see only 1.
+      const pro = getQuestionsForLevel('professional');
+      expect(pro.length).toBeGreaterThan(1);
+    });
+
+    it('setQuestionActive invalidates the row level and leaves the other level alone', async () => {
+      // Populate both levels.
+      const refreshChain = makeChainable({
+        data: [
+          makeSampleRow({ id: 'q-pro', level: 'professional' }),
+          makeSampleRow({ id: 'q-sub', level: 'sub-professional' }),
+        ],
+        error: null,
+      });
+      fromSpy.mockReturnValue(refreshChain);
+      await refreshQuestionsFromDb({ from: fromSpy } as never);
+      expect(questionsAreFromDb('professional')).toBe(true);
+      expect(questionsAreFromDb('sub-professional')).toBe(true);
+
+      // setQuestionActive does a level lookup (select.eq.maybeSingle)
+      // and then an update. Mock both.
+      const lookupChain: Record<string, unknown> = {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn(() =>
+              Promise.resolve({ data: { level: 'professional' }, error: null }),
+            ),
+          })),
+        })),
+        update: vi.fn(() => makeChainable({ data: null, error: null })),
+      };
+      fromSpy.mockReturnValue(lookupChain);
+      await setQuestionActive({ from: fromSpy } as never, 'q-pro', false);
+
+      // Professional invalidated; sub-professional still cached.
+      expect(questionsAreFromDb('professional')).toBe(false);
+      expect(questionsAreFromDb('sub-professional')).toBe(true);
+    });
+
+    it('getQuestionsCacheTimestamp reflects the most recent refresh', async () => {
+      const { getQuestionsCacheTimestamp } = await import('../src/lib/questions');
+      // Before any refresh, timestamp is null (or stale from a prior
+      // test; we re-establish by re-importing the module).
+      vi.resetModules();
+      const mod = await import('../src/lib/questions');
+      const chain = makeChainable({
+        data: [makeSampleRow()],
+        error: null,
+      });
+      fromSpy.mockReturnValue(chain);
+      const before = Date.now();
+      await mod.refreshQuestionsFromDb({ from: fromSpy } as never);
+      const after = Date.now();
+      const ts = mod.getQuestionsCacheTimestamp('professional');
+      expect(ts).not.toBeNull();
+      expect(ts!).toBeGreaterThanOrEqual(before);
+      expect(ts!).toBeLessThanOrEqual(after);
     });
   });
 });
