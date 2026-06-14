@@ -746,33 +746,46 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
 
         {status === 'ready' && filtered.length > 0 && (
           <div className="mt-6 space-y-2">
-            <div className="flex items-center justify-between gap-3 px-1 pb-1">
-              <label className="inline-flex items-center gap-2 text-xs text-on-surface-variant cursor-pointer">
-                <input
-                  type="checkbox"
-                  aria-label="Select all visible questions"
-                  checked={
-                    filtered.length > 0 &&
-                    filtered.every((x) => selectedIds.has(x.id))
-                  }
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedIds(new Set(filtered.map((x) => x.id)));
-                    } else {
-                      setSelectedIds(new Set());
+            <div
+              className="flex items-center justify-between gap-3 px-1 pb-1"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center gap-2 text-xs text-on-surface-variant cursor-pointer">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible questions"
+                    checked={
+                      filtered.length > 0 &&
+                      filtered.every((x) => selectedIds.has(x.id))
                     }
-                  }}
-                  className="w-4 h-4"
-                />
-                <span>
-                  Select all visible
-                  {selectedIds.size > 0 && (
-                    <span className="ml-2 font-bold text-primary">
-                      · {selectedIds.size} selected
-                    </span>
-                  )}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(new Set(filtered.map((x) => x.id)));
+                      } else {
+                        setSelectedIds(new Set());
+                      }
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <span>
+                    Select all visible
+                    {selectedIds.size > 0 && (
+                      <span className="ml-2 font-bold text-primary">
+                        · {selectedIds.size} selected
+                      </span>
+                    )}
+                  </span>
+                </label>
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant"
+                  data-testid="list-count"
+                >
+                  Showing {filtered.length} question{filtered.length === 1 ? '' : 's'}
+                  {searchAllTopics && debouncedSearch.trim() ? ' (search across all topics)' : ''}
                 </span>
-              </label>
+              </div>
               {selectedIds.size > 0 && (
                 <BulkActionBar
                   selected={filtered.filter((x) => selectedIds.has(x.id))}
