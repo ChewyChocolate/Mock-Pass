@@ -30,6 +30,7 @@ import { useAdmin } from '../lib/admin';
 import { getSupabaseClient } from '../lib/supabase';
 import {
   fetchAdminQuestions,
+  fetchTopicCounts,
   questionsAreFromDb,
   getQuestionsCacheTimestamp,
   saveQuestion,
@@ -87,6 +88,10 @@ export default function AdminQuestionsScreen({
   const [searchAllTopics, setSearchAllTopics] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Per-topic row counts for the current level, used to render
+  // "Verbal Ability (40)" labels in the topic <select>. Refreshed
+  // when the level changes (or after a bulk action).
+  const [topicCounts, setTopicCounts] = useState<Record<string, number>>({});
   // Bulk selection. Lives alongside the list state and is cleared
   // whenever a filter change could make the visible set diverge
   // from the selected set (see useEffect below).
@@ -154,6 +159,38 @@ export default function AdminQuestionsScreen({
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, filter.level, filter.topic, activeFilter, searchAllTopics, debouncedSearch, dbLoaded]);
+
+  // Refresh per-topic row counts when the level changes. Cheap
+  // (one round-trip per level, the response is just topic strings)
+  // and only runs on level changes, not on topic or search.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+    (async () => {
+      try {
+        const client = getSupabaseClient();
+        const result = await fetchTopicCounts(client, filter.level);
+        if (active && result.ok) setTopicCounts(result.counts);
+      } catch {
+        // Best effort; if the count fetch fails, the topic
+        // <select> simply shows the topic name with no count.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isAdmin, filter.level, dbLoaded]);
+
+  const refreshTopicCounts = async () => {
+    if (!isAdmin) return;
+    try {
+      const client = getSupabaseClient();
+      const result = await fetchTopicCounts(client, filter.level);
+      if (result.ok) setTopicCounts(result.counts);
+    } catch {
+      // ignore
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
@@ -535,11 +572,15 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               }
               className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm"
             >
-              {QUESTION_TOPICS_BY_LEVEL[filter.level].map((t) => (
-                <option key={t} value={t}>
-                  {TOPIC_SHORT_LABELS[t] ?? t}
-                </option>
-              ))}
+              {QUESTION_TOPICS_BY_LEVEL[filter.level].map((t) => {
+                const count = topicCounts[t];
+                return (
+                  <option key={t} value={t}>
+                    {TOPIC_SHORT_LABELS[t] ?? t}
+                    {count !== undefined ? ` (${count})` : ''}
+                  </option>
+                );
+              })}
             </select>
 
             <div className="relative flex-1">
@@ -661,6 +702,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                   onAfterAction={async () => {
                     setSelectedIds(new Set());
                     await refresh();
+                    await refreshTopicCounts();
                   }}
                 />
               )}

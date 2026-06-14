@@ -148,6 +148,40 @@ export interface FetchAdminQuestionsResult {
   error?: string;
 }
 
+export interface FetchTopicCountsResult {
+  ok: boolean;
+  /** Map of topic -> count of rows for the given level. */
+  counts: Record<string, number>;
+  error?: string;
+}
+
+/**
+ * Fetch per-topic row counts for a single level. Used by the
+ * admin Question Bank topic dropdown so each option can render
+ * "Verbal Ability (40)" instead of a bare label.
+ *
+ * Cheap: we select only the topic column, the response is small
+ * (4-5 rows of strings), and the caller can do the bucketing in
+ * memory. A more ambitious Postgres-side aggregation would need
+ * a SECURITY DEFINER RPC and is overkill for a 4-bucket list.
+ */
+export async function fetchTopicCounts(
+  client: SupabaseClient,
+  level: ExamLevel,
+): Promise<FetchTopicCountsResult> {
+  const { data, error } = await client
+    .from('questions')
+    .select('topic')
+    .eq('level', level);
+  if (error) return { ok: false, counts: {}, error: error.message };
+  const rows = (data ?? []) as Array<{ topic: string }>;
+  const counts: Record<string, number> = {};
+  for (const r of rows) {
+    counts[r.topic] = (counts[r.topic] ?? 0) + 1;
+  }
+  return { ok: true, counts };
+}
+
 export async function fetchAdminQuestions(
   client: SupabaseClient,
   filter?: {

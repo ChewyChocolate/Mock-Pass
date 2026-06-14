@@ -448,6 +448,48 @@ describe('questions lib', () => {
     });
   });
 
+  describe('fetchTopicCounts', () => {
+    it('returns ok with an empty map when no rows exist', async () => {
+      const { fetchTopicCounts } = await import('../src/lib/questions');
+      fromSpy.mockReturnValue(makeChainable({ data: [], error: null }));
+      const result = await fetchTopicCounts({ from: fromSpy } as never, 'professional');
+      expect(result.ok).toBe(true);
+      expect(result.counts).toEqual({});
+    });
+
+    it('buckets rows by topic', async () => {
+      const { fetchTopicCounts } = await import('../src/lib/questions');
+      fromSpy.mockReturnValue(
+        makeChainable({
+          data: [
+            { topic: 'Verbal Ability' },
+            { topic: 'Verbal Ability' },
+            { topic: 'Numerical Ability' },
+            { topic: 'Verbal Ability' },
+          ],
+          error: null,
+        }),
+      );
+      const result = await fetchTopicCounts({ from: fromSpy } as never, 'professional');
+      expect(result.ok).toBe(true);
+      expect(result.counts).toEqual({
+        'Verbal Ability': 3,
+        'Numerical Ability': 1,
+      });
+    });
+
+    it('surfaces the error message on failure', async () => {
+      const { fetchTopicCounts } = await import('../src/lib/questions');
+      fromSpy.mockReturnValue(
+        makeChainable({ data: null, error: { message: 'forbidden' } }),
+      );
+      const result = await fetchTopicCounts({ from: fromSpy } as never, 'professional');
+      expect(result.ok).toBe(false);
+      expect(result.counts).toEqual({});
+      expect(result.error).toBe('forbidden');
+    });
+  });
+
   describe('saveQuestion retry on PK collision', () => {
     it('retries once with a fresh id on 23505 and surfaces the real error on a second failure', async () => {
       const { saveQuestion, createNewQuestionId } = await import('../src/lib/questions');
