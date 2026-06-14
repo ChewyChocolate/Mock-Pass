@@ -85,23 +85,35 @@ export async function fetchIsAdmin(email: string | null | undefined): Promise<bo
  * allowlist. Starts false (loading) and updates after the async check
  * completes. Cache TTL is 60s; pass `refresh()` to force a re-check.
  */
-export function useAdmin(): boolean {
+/**
+ * React hook that reports whether the current user is an admin. Starts
+ * at `isLoading: true, isAdmin: false` so a freshly-mounted admin
+ * section can render a spinner instead of flashing the "no access"
+ * panel during the ~200 ms RPC. After the check resolves,
+ * `isLoading` is false and `isAdmin` reflects the allowlist.
+ */
+export function useAdmin(): { isAdmin: boolean; isLoading: boolean } {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setIsLoading(true);
     (async () => {
       const result = await fetchIsAdmin(user?.email);
-      if (active) setIsAdmin(result);
+      if (active) {
+        setIsAdmin(result);
+        setIsLoading(false);
+      }
     })();
     return () => {
       active = false;
     };
   }, [user?.email, tick]);
 
-  return isAdmin;
+  return { isAdmin, isLoading };
 }
 
 /**

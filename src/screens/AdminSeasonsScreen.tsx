@@ -81,7 +81,7 @@ export default function AdminSeasonsScreen({
   onNavigate,
   onSelectSection,
 }: AdminSeasonsScreenProps) {
-  const isAdmin = useAdmin();
+  const isAdmin = useAdmin().isAdmin;
   // Gate the data fetch on isAdmin. A non-admin visiting /admin used to
   // trigger an RLS-denied network call before the access-denied state
   // rendered; the hook now no-ops when disabled.

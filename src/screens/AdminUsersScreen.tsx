@@ -31,7 +31,7 @@ export default function AdminUsersScreen({
   onNavigate,
   onSelectSection,
 }: AdminUsersScreenProps) {
-  const isAdmin = useAdmin();
+  const isAdmin = useAdmin().isAdmin;
   const { status, users, error: searchError, search, refresh } = useAdminUsers(isAdmin);
   const {
     status: sessionsStatus,

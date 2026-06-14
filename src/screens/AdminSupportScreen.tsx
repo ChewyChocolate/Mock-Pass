@@ -49,7 +49,7 @@ export default function AdminSupportScreen({
   onNavigate,
   onSelectSection,
 }: AdminSupportScreenProps) {
-  const isAdmin = useAdmin();
+  const isAdmin = useAdmin().isAdmin;
   const { status, tickets, error, refresh } = useAllTickets(isAdmin);
   const { update, busy: updateBusy } = useUpdateTicket();
   const [filter, setFilter] = useState<SupportTicketStatus | 'all'>('open');

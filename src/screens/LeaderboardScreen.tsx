@@ -8,7 +8,7 @@ import {
   Hourglass,
   CalendarRange,
 } from 'lucide-react';
-import { BaseScreenProps, ExamLevel, LEVEL_LABELS, LeaderboardTab, PROFESSIONAL_TOPIC_IDS, TOPIC_SHORT_LABELS } from '../types';
+import { BaseScreenProps, ExamLevel, LEVEL_LABELS, LeaderboardTab, QUESTION_TOPICS_BY_LEVEL, TOPIC_SHORT_LABELS } from '../types';
 import MainLayout from '../components/MainLayout';
 import { EmptyState } from '../components/EmptyState';
 import { useAuth } from '../context/AuthContext';
@@ -31,7 +31,7 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
   const [tab, setTab] = useState<LeaderboardTab>('all-time');
   const [level, setLevel] = useState<ExamLevel>(examState.level);
   const [topic, setTopic] = useState<string>(
-    examState.level === 'professional' ? PROFESSIONAL_TOPIC_IDS[0] : 'Verbal Ability',
+    examState.level === 'professional' ? QUESTION_TOPICS_BY_LEVEL.professional[0] : 'Verbal Ability',
   );
 
   const { status, entries, userRank, error, season, seasonError } = useLeaderboard(
@@ -51,8 +51,8 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
 
   const handleLevelChange = (next: ExamLevel) => {
     setLevel(next);
-    if (next === 'professional' && !PROFESSIONAL_TOPIC_IDS.includes(topic as never)) {
-      setTopic(PROFESSIONAL_TOPIC_IDS[0]);
+    if (next === 'professional' && !QUESTION_TOPICS_BY_LEVEL.professional.includes(topic as never)) {
+      setTopic(QUESTION_TOPICS_BY_LEVEL.professional[0]);
     }
     // If the user is on the "Per Topic" tab but switches to sub-pro, fall
     // back to the All-Time tab — sub-pro per-topic boards aren't shipped yet.
@@ -158,7 +158,7 @@ export default function LeaderboardScreen({ onNavigate }: BaseScreenProps) {
                   onChange={(e) => setTopic(e.target.value)}
                   className="appearance-none bg-surface-container-low border border-outline-variant px-3 py-2 pr-8 text-sm font-semibold text-on-surface rounded-sm"
                 >
-                  {PROFESSIONAL_TOPIC_IDS.map((t) => (
+                  {QUESTION_TOPICS_BY_LEVEL.professional.map((t) => (
                     <option key={t} value={t}>
                       {TOPIC_SHORT_LABELS[t] ?? t}
                     </option>

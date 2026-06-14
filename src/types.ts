@@ -83,19 +83,6 @@ export interface ExamSessionSummary {
 
 export type LeaderboardTab = 'all-time' | 'week' | 'topic';
 
-export type QuestionTopicId =
-  | 'Verbal Ability'
-  | 'Analytical Reasoning'
-  | 'Numerical Ability'
-  | 'General Information';
-
-export const PROFESSIONAL_TOPIC_IDS: QuestionTopicId[] = [
-  'Verbal Ability',
-  'Analytical Reasoning',
-  'Numerical Ability',
-  'General Information',
-];
-
 /**
  * Canonical list of topics per exam level. Single source of truth for
  * filter dropdowns, edit forms, and the DB CHECK constraint in

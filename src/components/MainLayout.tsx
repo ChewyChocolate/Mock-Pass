@@ -34,7 +34,7 @@ const PRO_FEATURES = [
 export default function MainLayout({ children, onNavigate, currentScreen }: { children: React.ReactNode, onNavigate: BaseScreenProps['onNavigate'], currentScreen: Screen }) {
   const { theme, toggleTheme } = useTheme();
   const { signOut: authSignOut, user } = useAuth();
-  const isAdmin = useAdmin();
+  const isAdmin = useAdmin().isAdmin;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);

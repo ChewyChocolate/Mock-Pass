@@ -25,7 +25,7 @@ export default function AdminStatsScreen({
   onNavigate,
   onSelectSection,
 }: AdminStatsScreenProps) {
-  const isAdmin = useAdmin();
+  const isAdmin = useAdmin().isAdmin;
   const { status, stats, error, refresh } = useAdminStats(isAdmin);
 
   const handleSectionSelect = (id: AdminSectionId) => {

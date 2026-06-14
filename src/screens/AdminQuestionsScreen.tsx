@@ -63,7 +63,7 @@ export default function AdminQuestionsScreen({
   onNavigate,
   onSelectSection,
 }: AdminQuestionsScreenProps) {
-  const isAdmin = useAdmin();
+  const { isAdmin, isLoading: isAdminLoading } = useAdmin();
   const toast = useToast();
   const { loaded: dbLoaded } = useQuestionsLoaded();
   // Monotonic request token. Each refresh() invocation captures the
@@ -310,6 +310,17 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
   );
 }
 
+  if (isAdminLoading) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="min-h-screen bg-surface text-on-surface font-sans flex items-center justify-center p-6"
+      >
+        <p className="text-sm text-on-surface-variant">Checking access…</p>
+      </div>
+    );
+  }
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-surface text-on-surface font-sans flex items-center justify-center p-6">
