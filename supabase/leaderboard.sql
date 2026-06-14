@@ -586,6 +586,18 @@ create trigger support_tickets_touch_updated_at
 -- Returns up to 20 users whose email or handle matches the search
 -- string. SECURITY DEFINER + is_admin_email() guard. Reads from
 -- auth.users, which the anon role cannot SELECT directly.
+--
+-- Implementation note: the inner SELECT must use a CTE for the
+-- session-counts aggregate, NOT a subquery in the FROM clause. The
+-- subquery form (select user_id, count(*) as cnt from
+-- public.exam_sessions group by user_id) was producing
+--   column reference "email" is ambiguous
+-- in production (Postgres 15), apparently because the RETURNS TABLE
+-- output column "email" was being pulled into the subquery's scope
+-- resolution along with the outer column references. The CTE form
+-- isolates the scope. The explicit `as email` / `as handle` aliases
+-- on the projection are belt-and-suspenders.
+-- auth.users, which the anon role cannot SELECT directly.
 create or replace function public.admin_search_users(search text)
 returns table (
   user_id uuid,
@@ -607,19 +619,20 @@ begin
   end if;
 
   return query
+  with session_counts as (
+    select es.user_id, count(*)::bigint as cnt
+    from public.exam_sessions es
+    group by es.user_id
+  )
   select
     au.id as user_id,
-    au.email,
-    p.handle,
-    au.created_at,
-    coalesce(s.cnt, 0) as sessions_count
+    au.email as email,
+    p.handle as handle,
+    au.created_at as created_at,
+    coalesce(sc.cnt, 0) as sessions_count
   from auth.users au
   left join public.profiles p on p.user_id = au.id
-  left join (
-    select user_id, count(*) as cnt
-    from public.exam_sessions
-    group by user_id
-  ) s on s.user_id = au.id
+  left join session_counts sc on sc.user_id = au.id
   where
     search is null
     or search = ''
