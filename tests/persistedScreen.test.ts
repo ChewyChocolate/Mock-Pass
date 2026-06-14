@@ -77,3 +77,39 @@ describe('persisted screen', () => {
     expect(localStorage.getItem(STORAGE_KEYS.screen)).toBeNull();
   });
 });
+
+describe('persisted admin section', () => {
+  const VALID_ADMIN = new Set<string>(['seasons', 'users', 'questions', 'support', 'stats']);
+
+  function readSection(): string {
+    const raw = localStorage.getItem(STORAGE_KEYS.adminSection);
+    if (raw && VALID_ADMIN.has(raw)) return raw;
+    return 'seasons';
+  }
+  function writeSection(section: string): void {
+    localStorage.setItem(STORAGE_KEYS.adminSection, section);
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('defaults to seasons when nothing is stored', () => {
+    expect(readSection()).toBe('seasons');
+  });
+
+  it('round-trips every valid section', () => {
+    for (const s of ['seasons', 'users', 'questions', 'support', 'stats']) {
+      writeSection(s);
+      expect(readSection()).toBe(s);
+    }
+  });
+
+  it('rejects unknown values and falls back to seasons', () => {
+    localStorage.setItem(STORAGE_KEYS.adminSection, 'banana');
+    expect(readSection()).toBe('seasons');
+  });
+});

@@ -13,6 +13,9 @@ export const STORAGE_KEYS = {
   /** Last-viewed screen. Restored on hard refresh so the user lands
    *  where they left off. Cleared on sign-out. */
   screen: 'mockpass:screen',
+  /** Active admin-console section. Restored on hard refresh so admins
+   *  don't get bounced back to the default "Exam Seasons" tab. */
+  adminSection: 'mockpass:admin-section',
   /** User-selected theme. */
   theme: 'mockpass:theme',
 } as const;

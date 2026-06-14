@@ -35,6 +35,14 @@ const VALID_SCREENS: ReadonlySet<Screen> = new Set<Screen>([
   'admin',
 ]);
 
+const VALID_ADMIN_SECTIONS: ReadonlySet<AdminSectionId> = new Set<AdminSectionId>([
+  'seasons',
+  'users',
+  'questions',
+  'support',
+  'stats',
+]);
+
 function readPersistedScreen(): Screen {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.screen);
@@ -61,8 +69,36 @@ function writePersistedScreen(screen: Screen): void {
   }
 }
 
+function readPersistedAdminSection(): AdminSectionId {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.adminSection);
+    if (raw && (VALID_ADMIN_SECTIONS as ReadonlySet<string>).has(raw)) {
+      return raw as AdminSectionId;
+    }
+  } catch {
+    // Same localStorage-may-be-disabled caveat as above.
+  }
+  return 'seasons';
+}
+
+function writePersistedAdminSection(section: AdminSectionId): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.adminSection, section);
+  } catch {
+    // Best effort; in-memory state still works for the page life.
+  }
+}
+
 function AdminRouter({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [section, setSection] = useState<AdminSectionId>('seasons');
+  const [section, setSectionState] = useState<AdminSectionId>(() => readPersistedAdminSection());
+
+  // Mirror the screen-level persistence: every section change is
+  // written to localStorage so a hard refresh (or a tab restore)
+  // brings the admin back to the same section.
+  const setSection = (next: AdminSectionId) => {
+    setSectionState(next);
+    writePersistedAdminSection(next);
+  };
   if (section === 'stats') {
     return (
       <AdminStatsScreen
