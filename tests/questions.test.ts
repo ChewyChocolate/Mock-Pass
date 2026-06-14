@@ -138,13 +138,15 @@ describe('questions lib', () => {
     });
 
     it('uses server-side ilike when search is provided', async () => {
-      const orSpy = vi.fn(() => makeChainable({ data: [], error: null }));
-      const eqSpy = vi.fn(() => ({ or: orSpy }));
+      const orSpy = vi.fn();
       const chain: Record<string, unknown> = {
         select: vi.fn(() => chain),
         order: vi.fn(() => chain),
-        eq: eqSpy,
-        or: orSpy,
+        eq: vi.fn(() => chain),
+        or: vi.fn((arg: string) => {
+          orSpy(arg);
+          return chain;
+        }),
       };
       fromSpy.mockReturnValue(chain);
       await fetchAdminQuestions({ from: fromSpy } as never, {
@@ -158,12 +160,15 @@ describe('questions lib', () => {
     });
 
     it('escapes LIKE wildcards in the search text', async () => {
-      const orSpy = vi.fn(() => makeChainable({ data: [], error: null }));
+      const orSpy = vi.fn();
       const chain: Record<string, unknown> = {
         select: vi.fn(() => chain),
         order: vi.fn(() => chain),
-        eq: vi.fn(() => ({ or: orSpy })),
-        or: orSpy,
+        eq: vi.fn(() => chain),
+        or: vi.fn((arg: string) => {
+          orSpy(arg);
+          return chain;
+        }),
       };
       fromSpy.mockReturnValue(chain);
       await fetchAdminQuestions({ from: fromSpy } as never, { search: '100%' });
@@ -175,11 +180,11 @@ describe('questions lib', () => {
     });
 
     it('does not call .or() when search is empty', async () => {
-      const orSpy = vi.fn(() => makeChainable({ data: [], error: null }));
+      const orSpy = vi.fn();
       const chain: Record<string, unknown> = {
         select: vi.fn(() => chain),
         order: vi.fn(() => chain),
-        eq: vi.fn(() => ({ or: orSpy })),
+        eq: vi.fn(() => chain),
         or: orSpy,
       };
       fromSpy.mockReturnValue(chain);

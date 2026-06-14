@@ -56,9 +56,16 @@ export function durationForLevel(level: ExamLevel): number {
   return level === 'professional' ? PRO_DURATION_SECONDS : SUB_PRO_DURATION_SECONDS;
 }
 
-export function getQuestionsForLevel(level: ExamLevel): Question[] {
-  return level === 'professional' ? PROFESSIONAL_QUESTIONS : SUB_PROFESSIONAL_QUESTIONS;
-}
+// getQuestionsForLevel is intentionally NOT re-defined here. The
+// authoritative implementation lives in lib/questions.ts, where it
+// overlays the DB cache on top of the bundled JS. We re-export it
+// here for backward compatibility with the many import sites that
+// already pull from this module. Do NOT add a second implementation;
+// if you need the DB-aware path, import from 'lib/questions' directly.
+//
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _ReexportOnly = ExamLevel;
+export { getQuestionsForLevel } from '../lib/questions';
 
 /**
  * Walk the question set once and produce per-topic correct/total tallies.
