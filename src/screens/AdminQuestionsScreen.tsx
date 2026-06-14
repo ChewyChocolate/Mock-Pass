@@ -34,10 +34,12 @@ import {
   getQuestionsCacheTimestamp,
   saveQuestion,
   setQuestionActive,
+  bulkSetQuestionActive,
   createNewQuestionId,
   type AdminQuestion,
   type SaveQuestionInput,
 } from '../lib/questions';
+import { questionsToCsv, downloadCsv } from '../utils/csvExport';
 import { useQuestionsLoaded } from '../hooks/useQuestions';
 import { formatRelative } from '../utils/format';
 import { useToast } from '../components/Toast';
@@ -85,6 +87,11 @@ export default function AdminQuestionsScreen({
   const [searchAllTopics, setSearchAllTopics] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Bulk selection. Lives alongside the list state and is cleared
+  // whenever a filter change could make the visible set diverge
+  // from the selected set (see useEffect below).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
@@ -140,6 +147,10 @@ export default function AdminQuestionsScreen({
   };
 
   useEffect(() => {
+    // Filter changes can change the visible set; clear selection
+    // so we never show a checked box for a row that's no longer
+    // visible (the user would not be able to find / uncheck it).
+    setSelectedIds(new Set());
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, filter.level, filter.topic, activeFilter, searchAllTopics, debouncedSearch, dbLoaded]);
@@ -269,6 +280,99 @@ export default function AdminQuestionsScreen({
       setTogglingId(null);
     }
   };
+
+function BulkActionBar({
+  selected,
+  onClear,
+  onAfterAction,
+}: {
+  selected: AdminQuestion[];
+  onClear: () => void;
+  onAfterAction: () => Promise<void> | void;
+}) {
+  const { show } = useToast();
+  const [busy, setBusy] = useState(false);
+  const ids = selected.map((q) => q.id);
+  const count = ids.length;
+
+  const runBulk = async (
+    targetActive: boolean,
+    verb: 'enable' | 'disable',
+  ) => {
+    if (busy || count === 0) return;
+    setBusy(true);
+    try {
+      const client = getSupabaseClient();
+      const result = await bulkSetQuestionActive(client, ids, targetActive);
+      if (!result.ok) {
+        show(`Failed to ${verb} ${count} questions: ${result.error ?? 'unknown error'}`, 'error', 6000);
+        return;
+      }
+      show(
+        `${verb === 'enable' ? 'Enabled' : 'Disabled'} ${result.updated} questions.`,
+        'success',
+      );
+      await onAfterAction();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportSelected = () => {
+    if (selected.length === 0) return;
+    const csv = questionsToCsv(selected);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadCsv(`mockpass-questions-${stamp}.csv`, csv);
+    show(`Exported ${selected.length} questions.`, 'success');
+  };
+
+  return (
+    <div
+      role="toolbar"
+      aria-label={`Bulk actions for ${count} selected questions`}
+      className="flex items-center gap-2 bg-primary-container border border-primary/40 rounded px-2 py-1"
+    >
+      <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+        Bulk:
+      </span>
+      <button
+        type="button"
+        onClick={() => runBulk(true, 'enable')}
+        disabled={busy}
+        aria-busy={busy}
+        className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded bg-tertiary text-on-primary hover:brightness-110 disabled:opacity-50"
+      >
+        Enable
+      </button>
+      <button
+        type="button"
+        onClick={() => runBulk(false, 'disable')}
+        disabled={busy}
+        aria-busy={busy}
+        className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded bg-error text-on-error hover:brightness-110 disabled:opacity-50"
+      >
+        Disable
+      </button>
+      <button
+        type="button"
+        onClick={exportSelected}
+        disabled={busy}
+        className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded bg-surface-container-high border border-outline-variant text-on-surface hover:bg-surface-variant disabled:opacity-50"
+      >
+        Export CSV
+      </button>
+      <button
+        type="button"
+        onClick={onClear}
+        disabled={busy}
+        aria-label="Clear selection"
+        className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded text-on-surface-variant hover:text-on-surface disabled:opacity-50"
+      >
+        <X className="w-3 h-3" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
 
 function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boolean }) {
   if (!dbLoaded) {
@@ -523,20 +627,79 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
 
         {status === 'ready' && filtered.length > 0 && (
           <div className="mt-6 space-y-2">
+            <div className="flex items-center justify-between gap-3 px-1 pb-1">
+              <label className="inline-flex items-center gap-2 text-xs text-on-surface-variant cursor-pointer">
+                <input
+                  type="checkbox"
+                  aria-label="Select all visible questions"
+                  checked={
+                    filtered.length > 0 &&
+                    filtered.every((x) => selectedIds.has(x.id))
+                  }
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds(new Set(filtered.map((x) => x.id)));
+                    } else {
+                      setSelectedIds(new Set());
+                    }
+                  }}
+                  className="w-4 h-4"
+                />
+                <span>
+                  Select all visible
+                  {selectedIds.size > 0 && (
+                    <span className="ml-2 font-bold text-primary">
+                      · {selectedIds.size} selected
+                    </span>
+                  )}
+                </span>
+              </label>
+              {selectedIds.size > 0 && (
+                <BulkActionBar
+                  selected={filtered.filter((x) => selectedIds.has(x.id))}
+                  onClear={() => setSelectedIds(new Set())}
+                  onAfterAction={async () => {
+                    setSelectedIds(new Set());
+                    await refresh();
+                  }}
+                />
+              )}
+            </div>
             {filtered.map((q) => {
               const isOpen = expanded === q.id;
               const panelId = `q-panel-${q.id}`;
+              const isSelected = selectedIds.has(q.id);
               return (
                 <div
                   key={q.id}
                   className="border border-outline-variant/50 rounded bg-surface-container-low overflow-hidden"
                 >
-                  <button
-                    onClick={() => setExpanded(isOpen ? null : q.id)}
-                    className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-surface-container/50 transition-colors"
-                    aria-expanded={isOpen}
-                    aria-controls={panelId}
-                  >
+                  <div className="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface-container/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select question ${q.id}`}
+                      checked={isSelected}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) {
+                            next.add(q.id);
+                          } else {
+                            next.delete(q.id);
+                          }
+                          return next;
+                        });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 shrink-0"
+                    />
+                    <button
+                      onClick={() => setExpanded(isOpen ? null : q.id)}
+                      className="flex-1 min-w-0 text-left flex items-center gap-3"
+                      aria-expanded={isOpen}
+                      aria-controls={panelId}
+                    >
                     <ChevronDown
                       className={`w-4 h-4 text-on-surface-variant transition-transform shrink-0 motion-reduce:transition-none ${
                         isOpen ? 'rotate-0' : '-rotate-90'
@@ -556,7 +719,8 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                         Disabled
                       </span>
                     )}
-                  </button>
+                    </button>
+                  </div>
 
                   {isOpen && (
                     <div

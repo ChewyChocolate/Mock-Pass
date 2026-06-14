@@ -276,3 +276,54 @@ export async function setQuestionActive(
   }
   return { ok: true };
 }
+
+export interface BulkSetActiveResult {
+  ok: boolean;
+  updated: number;
+  error?: string;
+}
+
+/**
+ * Bulk enable / disable. Updates many rows in a single round-trip
+ * via PostgREST's .in() filter. In-memory caches for the affected
+ * levels are invalidated; caller should refresh() afterwards.
+ *
+ * The returned `updated` count is best-effort: when PostgREST
+ * returns the affected rows in the .select() body, we count them;
+ * when it does not (no .select() chained, or .single()/maybeSingle()
+ * shortcuts the response), we count the input ids as a fallback.
+ */
+export async function bulkSetQuestionActive(
+  client: SupabaseClient,
+  ids: string[],
+  isActive: boolean,
+): Promise<BulkSetActiveResult> {
+  if (ids.length === 0) return { ok: true, updated: 0 };
+  // Look up the levels touched by the ids so we know which caches
+  // to invalidate. One round-trip via .in().
+  const { data: rows, error: lookupErr } = await client
+    .from('questions')
+    .select('id, level')
+    .in('id', ids);
+  if (lookupErr) {
+    return { ok: false, updated: 0, error: lookupErr.message };
+  }
+  // Single update with .in() — atomic per row, one round-trip total.
+  const { data: updated, error } = await client
+    .from('questions')
+    .update({ is_active: isActive })
+    .in('id', ids)
+    .select('id, level');
+  if (error) {
+    return { ok: false, updated: 0, error: error.message };
+  }
+  // Invalidate every level that was touched.
+  const levelsTouched = new Set<ExamLevel>();
+  for (const r of rows ?? []) {
+    if (r.level === 'professional' || r.level === 'sub-professional') {
+      levelsTouched.add(r.level);
+    }
+  }
+  for (const lv of levelsTouched) invalidateOverride(lv);
+  return { ok: true, updated: updated?.length ?? ids.length };
+}

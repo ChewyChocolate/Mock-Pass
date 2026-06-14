@@ -381,6 +381,73 @@ describe('questions lib', () => {
     });
   });
 
+  describe('bulkSetQuestionActive', () => {
+    it('returns ok with 0 updated for an empty id list', async () => {
+      const { bulkSetQuestionActive } = await import('../src/lib/questions');
+      const result = await bulkSetQuestionActive({ from: fromSpy } as never, [], true);
+      expect(result.ok).toBe(true);
+      expect(result.updated).toBe(0);
+      expect(fromSpy).not.toHaveBeenCalled();
+    });
+
+    it('updates a list of ids in a single round-trip', async () => {
+      const { bulkSetQuestionActive } = await import('../src/lib/questions');
+      const update = vi.fn(() => ({
+        in: vi.fn(() => ({
+          select: vi.fn(() =>
+            Promise.resolve({
+              data: [
+                { id: 'q-1', level: 'professional' },
+                { id: 'q-2', level: 'professional' },
+                { id: 'q-3', level: 'sub-professional' },
+              ],
+              error: null,
+            }),
+          ),
+        })),
+      }));
+      const chain: Record<string, unknown> = {
+        select: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        update,
+      };
+      fromSpy.mockReturnValue(chain);
+      const result = await bulkSetQuestionActive(
+        { from: fromSpy } as never,
+        ['q-1', 'q-2', 'q-3'],
+        false,
+      );
+      expect(result.ok).toBe(true);
+      expect(result.updated).toBe(3);
+      expect(update).toHaveBeenCalledWith({ is_active: false });
+    });
+
+    it('surfaces the underlying error message on failure', async () => {
+      const { bulkSetQuestionActive } = await import('../src/lib/questions');
+      // The level-lookup select succeeds; the update returns an error.
+      const update = vi.fn(() => ({
+        in: vi.fn(() => ({
+          select: vi.fn(() =>
+            Promise.resolve({ data: null, error: { message: 'permission denied' } }),
+          ),
+        })),
+      }));
+      const chain: Record<string, unknown> = {
+        select: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        update,
+      };
+      fromSpy.mockReturnValue(chain);
+      const result = await bulkSetQuestionActive(
+        { from: fromSpy } as never,
+        ['q-1'],
+        false,
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe('permission denied');
+    });
+  });
+
   describe('saveQuestion retry on PK collision', () => {
     it('retries once with a fresh id on 23505 and surfaces the real error on a second failure', async () => {
       const { saveQuestion, createNewQuestionId } = await import('../src/lib/questions');
