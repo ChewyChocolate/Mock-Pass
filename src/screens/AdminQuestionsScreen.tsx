@@ -560,11 +560,11 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
 
         {/* Filter bar */}
         <SectionCard>
-          <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex flex-col md:flex-row md:flex-wrap gap-3">
             <div
               role="radiogroup"
               aria-label="Filter questions by exam level"
-              className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-sm self-start"
+              className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-sm self-start shrink-0"
             >
               {(['professional', 'sub-professional'] as const).map((lvl) => (
                 <button
@@ -586,7 +586,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
             <div
               role="radiogroup"
               aria-label="Show active, disabled, or all questions"
-              className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-sm self-start"
+              className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-sm self-start shrink-0"
             >
               {(['active', 'disabled', 'all'] as const).map((opt) => (
                 <button
@@ -611,7 +611,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               onChange={(e) =>
                 setFilter((f) => ({ ...f, topic: e.target.value as QuestionTopic }))
               }
-              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm"
+              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm min-w-0 max-w-[14rem]"
             >
               {QUESTION_TOPICS_BY_LEVEL[filter.level].map((t) => {
                 const count = topicCounts[t];
@@ -624,7 +624,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               })}
             </select>
 
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-[12rem]">
               <label htmlFor="question-search" className="sr-only">
                 Search questions
               </label>
@@ -641,7 +641,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
             </div>
 
             <label
-              className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-on-surface-variant cursor-pointer self-start"
+              className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-on-surface-variant cursor-pointer self-start shrink-0"
               title="When on, the search box queries every topic and level; the level and topic filters are ignored."
             >
               <input
@@ -660,7 +660,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               onChange={(e) => setTagFilter(e.target.value)}
               placeholder="Filter by tag…"
               aria-label="Filter questions by tag"
-              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm w-32"
+              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm w-32 shrink-0"
             />
 
             <select
@@ -669,7 +669,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               onChange={(e) =>
                 setDifficultyFilter(e.target.value as typeof difficultyFilter)
               }
-              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm"
+              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm min-w-0 max-w-[10rem] shrink-0"
             >
               <option value="all">All difficulties</option>
               <option value="unrated">Unrated</option>
@@ -684,7 +684,7 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
               aria-label="Sort questions by"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm"
+              className="px-3 py-2 bg-surface-container-low border border-outline-variant rounded text-on-surface text-sm min-w-0 max-w-[12rem] shrink-0"
             >
               <option value="id">Sort: ID</option>
               <option value="updated_at">Sort: Recently updated</option>
