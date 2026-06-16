@@ -322,6 +322,92 @@ export interface BulkSetActiveResult {
 }
 
 /**
+ * One row of the bulk-insert progress callback. The caller
+ * receives incremental updates so it can render a progress
+ * bar / toast as each batch lands.
+ */
+export interface BulkInsertProgress {
+  /** 0-based batch index. */
+  batchIndex: number;
+  /** Total number of batches the caller will see. */
+  totalBatches: number;
+  /** Rows successfully inserted across all batches so far. */
+  insertedSoFar: number;
+  /** Rows the server rejected across all batches so far. */
+  failedSoFar: number;
+  /** True once the last batch has been awaited. */
+  done: boolean;
+}
+
+export interface BulkInsertResult {
+  ok: boolean;
+  inserted: number;
+  failed: number;
+  errors: Array<{ id: string; message: string }>;
+}
+
+/**
+ * Bulk-insert questions via chunked upserts. Each batch is sent
+ * as a single .upsert() call; on PK conflict PostgREST updates
+ * the existing row, so re-running an import after a partial
+ * failure is idempotent.
+ *
+ * If a payload is missing an `id`, a fresh `q-adm-{12hex}` id
+ * is generated so the caller does not have to coordinate ids
+ * client-side. Rows that the server reject (e.g. a CHECK
+ * violation surfaced on the DB side) are reported in
+ * `errors` with the row's effective id and the message; the
+ * bulk operation does not abort on a partial failure.
+ */
+export async function bulkInsertQuestions(
+  client: SupabaseClient,
+  rows: SaveQuestionInput[],
+  options: { batchSize?: number; onProgress?: (p: BulkInsertProgress) => void } = {},
+): Promise<BulkInsertResult> {
+  const batchSize = options.batchSize ?? 50;
+  const onProgress = options.onProgress;
+  if (rows.length === 0) {
+    onProgress?.({ batchIndex: 0, totalBatches: 0, insertedSoFar: 0, failedSoFar: 0, done: true });
+    return { ok: true, inserted: 0, failed: 0, errors: [] };
+  }
+
+  // Materialize inputs with stable ids up front. The server
+  // cannot generate ids for us, so this is the single point
+  // where id assignment happens for a batch.
+  const prepared: SaveQuestionInput[] = rows.map((r) => ({
+    ...r,
+    id: r.id && r.id.length > 0 ? r.id : createNewQuestionId(),
+  }));
+
+  const totalBatches = Math.ceil(prepared.length / batchSize);
+  let inserted = 0;
+  let failed = 0;
+  const errors: BulkInsertResult['errors'] = [];
+
+  for (let i = 0; i < totalBatches; i += 1) {
+    const batch = prepared.slice(i * batchSize, (i + 1) * batchSize);
+    const { error } = await client.from('questions').upsert(batch, { onConflict: 'id' });
+    if (error) {
+      failed += batch.length;
+      for (const row of batch) {
+        errors.push({ id: row.id, message: error.message });
+      }
+    } else {
+      inserted += batch.length;
+    }
+    onProgress?.({
+      batchIndex: i,
+      totalBatches,
+      insertedSoFar: inserted,
+      failedSoFar: failed,
+      done: i === totalBatches - 1,
+    });
+  }
+
+  return { ok: failed === 0, inserted, failed, errors };
+}
+
+/**
  * Bulk enable / disable. Updates many rows in a single round-trip
  * via PostgREST's .in() filter. In-memory caches for the affected
  * levels are invalidated; caller should refresh() afterwards.

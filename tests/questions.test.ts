@@ -450,6 +450,83 @@ describe('questions lib', () => {
     });
   });
 
+  describe('bulkInsertQuestions', () => {
+    it('returns ok with 0 inserted for an empty list', async () => {
+      const { bulkInsertQuestions } = await import('../src/lib/questions');
+      const result = await bulkInsertQuestions({ from: fromSpy } as never, []);
+      expect(result.ok).toBe(true);
+      expect(result.inserted).toBe(0);
+      expect(result.failed).toBe(0);
+      expect(fromSpy).not.toHaveBeenCalled();
+    });
+
+    it('assigns a fresh id when the row has none', async () => {
+      const { bulkInsertQuestions } = await import('../src/lib/questions');
+      const upsert = vi.fn(() => makeChainable({ data: null, error: null }));
+      fromSpy.mockReturnValue({ upsert });
+      // The sample row defaults to id 'q-test-1'; clear it so the
+      // lib is the one assigning the id.
+      const { id: _ignored, ...rest } = makeSampleRow();
+      void _ignored;
+      const result = await bulkInsertQuestions({ from: fromSpy } as never, [rest as never]);
+      expect(result.ok).toBe(true);
+      expect(result.inserted).toBe(1);
+      const forwarded = upsert.mock.calls[0][0] as Array<{ id: string }>;
+      expect(forwarded[0].id).toMatch(/^q-adm-[0-9a-f]{12}$/);
+    });
+
+    it('preserves a user-supplied id', async () => {
+      const { bulkInsertQuestions } = await import('../src/lib/questions');
+      const upsert = vi.fn(() => makeChainable({ data: null, error: null }));
+      fromSpy.mockReturnValue({ upsert });
+      const input = makeSampleRow({ id: 'q-import-1' });
+      const result = await bulkInsertQuestions({ from: fromSpy } as never, [input]);
+      expect(result.ok).toBe(true);
+      const forwarded = upsert.mock.calls[0][0] as Array<{ id: string }>;
+      expect(forwarded[0].id).toBe('q-import-1');
+    });
+
+    it('chunks into batches of the requested size and reports progress', async () => {
+      const { bulkInsertQuestions } = await import('../src/lib/questions');
+      const upsert = vi.fn(() => makeChainable({ data: null, error: null }));
+      fromSpy.mockReturnValue({ upsert });
+      const rows = Array.from({ length: 120 }, (_, i) => makeSampleRow({ id: `q-${i}` }));
+      const progress: Array<{ batchIndex: number; totalBatches: number; insertedSoFar: number; done: boolean }> = [];
+      const result = await bulkInsertQuestions({ from: fromSpy } as never, rows, {
+        batchSize: 50,
+        onProgress: (p) => progress.push(p),
+      });
+      expect(result.inserted).toBe(120);
+      expect(upsert).toHaveBeenCalledTimes(3);
+      expect(progress.map((p) => p.batchIndex)).toEqual([0, 1, 2]);
+      expect(progress[2].done).toBe(true);
+      expect(progress[2].insertedSoFar).toBe(120);
+    });
+
+    it('reports per-row errors when a batch fails the server check', async () => {
+      const { bulkInsertQuestions } = await import('../src/lib/questions');
+      const upsert = vi
+        .fn()
+        .mockReturnValueOnce(makeChainable({ data: null, error: null }))
+        .mockReturnValueOnce(
+          makeChainable({
+            data: null,
+            error: { message: 'questions_topic_check violated' },
+          }),
+        );
+      fromSpy.mockReturnValue({ upsert });
+      const rows = Array.from({ length: 100 }, (_, i) => makeSampleRow({ id: `q-${i}` }));
+      const result = await bulkInsertQuestions({ from: fromSpy } as never, rows, {
+        batchSize: 50,
+      });
+      expect(result.inserted).toBe(50);
+      expect(result.failed).toBe(50);
+      expect(result.ok).toBe(false);
+      expect(result.errors).toHaveLength(50);
+      expect(result.errors[0].message).toBe('questions_topic_check violated');
+    });
+  });
+
   describe('fetchTopicCounts', () => {
     it('returns ok with an empty map when no rows exist', async () => {
       const { fetchTopicCounts } = await import('../src/lib/questions');

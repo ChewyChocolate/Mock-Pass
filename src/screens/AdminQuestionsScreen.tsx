@@ -13,6 +13,7 @@ import {
   Check,
   Eye,
   Database,
+  Upload,
 } from 'lucide-react';
 import {
   BaseScreenProps,
@@ -26,6 +27,7 @@ import { SectionCard } from '../components/SectionCard';
 import { EmptyState } from '../components/EmptyState';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { BulkImportModal } from '../components/BulkImportModal';
 import { useAdmin } from '../lib/admin';
 import { getSupabaseClient } from '../lib/supabase';
 import {
@@ -111,6 +113,7 @@ export default function AdminQuestionsScreen({
     saveError: string | null;
   } | null>(null);
   const [pendingDisable, setPendingDisable] = useState<AdminQuestion | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const handleSectionSelect = (id: AdminSectionId) => {
     if (onSelectSection) onSelectSection(id);
@@ -547,6 +550,13 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
                 className={`w-4 h-4 ${status === 'loading' ? 'animate-spin' : ''}`}
               />
               {status === 'loading' ? 'Refreshing…' : 'Refresh'}
+            </button>
+            <button
+              onClick={() => setImportOpen(true)}
+              className="bg-surface-container-high border border-outline-variant text-on-surface px-3 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-surface-variant transition-all inline-flex items-center gap-1"
+            >
+              <Upload className="w-4 h-4" />
+              Import CSV
             </button>
             <button
               onClick={openNew}
@@ -1260,6 +1270,15 @@ function CacheStatusBadge({ level, dbLoaded }: { level: ExamLevel; dbLoaded: boo
         destructive={pendingDisable?.is_active ?? false}
         onConfirm={handleDisableConfirm}
         onCancel={() => setPendingDisable(null)}
+      />
+      <BulkImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onAfterImport={async () => {
+          setSelectedIds(new Set());
+          await refresh();
+          await refreshTopicCounts();
+        }}
       />
     </AdminLayout>
   );
