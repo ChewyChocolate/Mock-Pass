@@ -8,11 +8,14 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 import {
   getSupabaseClient,
   isSupabaseConfigured,
+  query,
+  SESSION_EXPIRED_EVENT,
   SupabaseConfigError,
+  type SessionExpiredDetail,
 } from '../lib/supabase';
 import { setDevAuthUser } from '../utils/devAuth';
 import type { UserProfile } from '../types';
@@ -99,23 +102,21 @@ interface ProfileRow {
 }
 
 async function fetchHandleForUser(
-  client: SupabaseClient,
   userId: string,
 ): Promise<string | null> {
-  const { data, error } = await client
-    .from('profiles')
-    .select('handle')
-    .eq('user_id', userId)
-    .maybeSingle<ProfileRow>();
+  const { data, error } = await query(async (client) =>
+    client.from('profiles').select('handle').eq('user_id', userId).maybeSingle<ProfileRow>(),
+  );
   if (error) {
-    console.warn('[mockpass] failed to fetch handle:', error.message);
+    if (error.message !== 'session_expired') {
+      console.warn('[mockpass] failed to fetch handle:', error.message);
+    }
     return null;
   }
-  return data?.handle ?? null;
+  return (data as ProfileRow | null)?.handle ?? null;
 }
 
 async function ensureProfileRow(
-  client: SupabaseClient,
   userId: string,
   email: string,
   firstName?: string,
@@ -136,15 +137,20 @@ async function ensureProfileRow(
       rand = Math.floor(Math.random() * 0xffffffff);
     }
     const handle = withNumericSuffix(base, rand % 100000);
-    const { error } = await client.from('profiles').insert({
-      user_id: userId,
-      handle,
-      first_name: firstName ?? null,
-      last_name: lastName ?? null,
-    });
+    const { error } = await query(async (client) =>
+      client.from('profiles').insert({
+        user_id: userId,
+        handle,
+        first_name: firstName ?? null,
+        last_name: lastName ?? null,
+      }),
+    );
     if (!error) return handle;
-    if (error.code !== '23505') {
+    if (error.code !== '23505' && error.message !== 'session_expired') {
       throw new Error(error.message);
+    }
+    if (error.message === 'session_expired') {
+      throw new Error('Session expired during sign up. Please sign in again.');
     }
   }
   throw new Error('Could not allocate a unique handle. Please try again.');
@@ -190,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState((prev) => ({ ...prev, handle: null }));
         return;
       }
-      const handle = await fetchHandleForUser(client, userId);
+      const handle = await fetchHandleForUser(userId);
       if (!active) return;
       setState((prev) => ({ ...prev, handle }));
     };
@@ -256,6 +262,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [configured]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onSessionExpired = (event: Event) => {
+      const detail = (event as CustomEvent<SessionExpiredDetail>).detail;
+      // Don't clobber a session that's currently being signed out by the
+      // user. The session-expired signal only matters while we believe
+      // the user is signed in.
+      setState((prev) => {
+        if (prev.status !== 'signed-in') return prev;
+        return {
+          ...prev,
+          status: 'signed-out',
+          user: null,
+          session: null,
+          handle: null,
+          error:
+            detail?.reason === 'refresh_failed'
+              ? 'Your session has expired. Please sign in again.'
+              : 'Your session has expired. Please sign in again.',
+        };
+      });
+      userIdRef.current = null;
+      setDevAuthUser(null);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  }, []);
+
   const signIn = useCallback(async (email: string, password: string) => {
     if (!clientRef.current) {
       const msg = 'Supabase is not configured.';
@@ -288,13 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const newUser = signUpData.user;
     if (newUser && signUpData.session) {
       try {
-        await ensureProfileRow(
-          clientRef.current,
-          newUser.id,
-          email,
-          data.first_name,
-          data.last_name,
-        );
+        await ensureProfileRow(newUser.id, email, data.first_name, data.last_name);
       } catch (profileErr) {
         console.warn('[mockpass] profile row creation failed:', profileErr);
       }

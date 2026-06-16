@@ -1,3 +1,4 @@
+import { query } from './supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ExamLevel, Question, QuestionTopic } from '../types';
 import PROFESSIONAL_QUESTIONS from '../data/questions/professionalQuestions';
@@ -92,33 +93,33 @@ export function invalidateOverride(level: ExamLevel): void {
 
 /**
  * Fetch the question bank from Supabase and cache it. Safe to call
- * repeatedly; idempotent.
+ * repeatedly; idempotent. Routes through `query()` so a stale access
+ * token is refreshed before the request fires; a session-expired
+ * condition emits the global `SESSION_EXPIRED_EVENT` and the cache
+ * is left untouched (the bundle remains the fallback).
  */
-export async function refreshQuestionsFromDb(client: SupabaseClient): Promise<void> {
-  try {
-    const { data, error } = await client
-      .from('questions')
-      .select('*')
-      .eq('is_active', true);
-    if (error) {
+export async function refreshQuestionsFromDb(): Promise<void> {
+  const { data, error } = await query(async (client) =>
+    client.from('questions').select('*').eq('is_active', true),
+  );
+  if (error) {
+    if (error.message !== 'session_expired') {
       console.warn('[mockpass] refreshQuestionsFromDb failed:', error.message);
-      return;
     }
-    const rows = (data ?? []) as QuestionRow[];
-    const proRows = rows.filter((r) => r.level === 'professional');
-    const subRows = rows.filter((r) => r.level === 'sub-professional');
-    const now = Date.now();
-    // Replace (not merge) so that disabling a question in the DB
-    // immediately removes it from the in-memory cache. An empty
-    // result set for a level is honored: the override becomes []
-    // and getQuestionsForLevel() falls back to the bundle.
-    proOverride = rowsToQuestions(proRows);
-    proOverrideAt = now;
-    subProOverride = rowsToQuestions(subRows);
-    subProOverrideAt = now;
-  } catch (err) {
-    console.warn('[mockpass] refreshQuestionsFromDb error:', err);
+    return;
   }
+  const rows = (data ?? []) as QuestionRow[];
+  const proRows = rows.filter((r) => r.level === 'professional');
+  const subRows = rows.filter((r) => r.level === 'sub-professional');
+  const now = Date.now();
+  // Replace (not merge) so that disabling a question in the DB
+  // immediately removes it from the in-memory cache. An empty
+  // result set for a level is honored: the override becomes []
+  // and getQuestionsForLevel() falls back to the bundle.
+  proOverride = rowsToQuestions(proRows);
+  proOverrideAt = now;
+  subProOverride = rowsToQuestions(subRows);
+  subProOverrideAt = now;
 }
 
 export function getQuestionsForLevel(level: ExamLevel): Question[] {

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { getSupabaseClient } from '../lib/supabase';
 import { refreshQuestionsFromDb } from '../lib/questions';
 
 let refreshPromise: Promise<void> | null = null;
@@ -11,14 +10,7 @@ let refreshPromise: Promise<void> | null = null;
  */
 export function preloadQuestions(): Promise<void> {
   if (refreshPromise) return refreshPromise;
-  refreshPromise = (async () => {
-    try {
-      const client = getSupabaseClient();
-      await refreshQuestionsFromDb(client);
-    } catch {
-      // ignore — fallback to the bundled JS
-    }
-  })();
+  refreshPromise = refreshQuestionsFromDb().catch(() => undefined);
   return refreshPromise;
 }
 

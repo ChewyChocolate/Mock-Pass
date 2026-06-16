@@ -150,7 +150,7 @@ if (enableDevTools && typeof window !== 'undefined') {
           const user = devAuthMod.peekSignedInUser();
           if (!user) return { error: 'not signed in' };
           const syncMod = await import('../lib/sync');
-          const result = await syncMod.fetchRemoteHistory(mod.getSupabaseClient(), user.id);
+          const result = await syncMod.fetchRemoteHistory(user.id);
           if (!result.ok) return { error: result.error };
           return { count: result.history.length, sessions: result.history };
         } catch (err) {

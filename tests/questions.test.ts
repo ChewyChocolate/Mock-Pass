@@ -17,8 +17,12 @@ vi.stubGlobal('localStorage', {
 });
 
 const fromSpy = vi.fn();
+const querySpy = vi.fn(
+  async (fn: (client: { from: typeof fromSpy }) => unknown) => fn({ from: fromSpy }),
+);
 vi.mock('../src/lib/supabase', () => ({
   getSupabaseClient: () => ({ from: fromSpy }),
+  query: (fn: (client: { from: typeof fromSpy }) => unknown) => querySpy(fn),
 }));
 
 // Import AFTER the mock is set up.
@@ -99,7 +103,7 @@ describe('questions lib', () => {
       });
       fromSpy.mockReturnValue(chain);
 
-      await refreshQuestionsFromDb({ from: fromSpy } as never);
+      await refreshQuestionsFromDb();
       expect(questionsAreFromDb('professional')).toBe(true);
       expect(questionsAreFromDb('sub-professional')).toBe(true);
     });
@@ -121,7 +125,7 @@ describe('questions lib', () => {
       // and pass through (the "warning was called" assertion is the
       // meaningful part).
       const mod = await import('../src/lib/questions');
-      await mod.refreshQuestionsFromDb({ from: fromSpy } as never);
+      await mod.refreshQuestionsFromDb();
       expect(warn).toHaveBeenCalled();
       warn.mockRestore();
     });
@@ -289,7 +293,7 @@ describe('questions lib', () => {
         error: null,
       });
       fromSpy.mockReturnValue(refreshChain);
-      await refreshQuestionsFromDb({ from: fromSpy } as never);
+      await refreshQuestionsFromDb();
       expect(questionsAreFromDb('professional')).toBe(true);
 
       // 2. Now save a question on the professional level. The mock
@@ -323,7 +327,7 @@ describe('questions lib', () => {
         error: null,
       });
       fromSpy.mockReturnValue(refreshChain);
-      await refreshQuestionsFromDb({ from: fromSpy } as never);
+      await refreshQuestionsFromDb();
       expect(questionsAreFromDb('professional')).toBe(true);
       expect(questionsAreFromDb('sub-professional')).toBe(true);
 
@@ -359,7 +363,7 @@ describe('questions lib', () => {
       });
       fromSpy.mockReturnValue(chain);
       const before = Date.now();
-      await mod.refreshQuestionsFromDb({ from: fromSpy } as never);
+      await mod.refreshQuestionsFromDb();
       const after = Date.now();
       const ts = mod.getQuestionsCacheTimestamp('professional');
       expect(ts).not.toBeNull();

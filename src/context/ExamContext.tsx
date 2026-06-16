@@ -26,7 +26,7 @@ import {
 } from '../data/questions';
 import { generateSeed, groupedShuffle } from '../utils/random';
 import { useAuth } from './AuthContext';
-import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { fetchRemoteHistory, pushSession } from '../lib/sync';
 import { STORAGE_KEYS } from '../lib/storageKeys';
 import { LIMITS } from '../lib/limits';
@@ -337,11 +337,10 @@ export function ExamProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const client = getSupabaseClient();
         // First sign-in on a fresh device: drop the local cache so remote
         // becomes the only source of truth.
         dispatch({ type: 'DISCARD_HISTORY' });
-        const result = await fetchRemoteHistory(client, user.id);
+        const result = await fetchRemoteHistory(user.id);
         if (cancelled) return;
         if (!result.ok) {
           console.warn('[mockpass] fetchRemoteHistory failed:', result.error);
@@ -388,8 +387,7 @@ export function ExamProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const client = getSupabaseClient();
-        const result = await pushSession(client, user.id, latest);
+        const result = await pushSession(user.id, latest);
         if (!result.ok) {
           console.warn('[mockpass] pushSession failed:', result.error);
         }

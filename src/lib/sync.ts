@@ -1,6 +1,6 @@
 import type { ExamSessionSummary, TopicStat } from '../types';
 import { migrateSessionScore } from '../data/questions';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { query } from './supabase';
 
 export interface ExamSessionRow {
   id: string;
@@ -55,15 +55,16 @@ export interface FetchResult {
 }
 
 export async function fetchRemoteHistory(
-  client: SupabaseClient,
   userId: string,
 ): Promise<FetchResult> {
-  const { data, error } = await client
-    .from(TABLE)
-    .select('*')
-    .eq('user_id', userId)
-    .order('submitted_at', { ascending: false })
-    .limit(20);
+  const { data, error } = await query(async (client) =>
+    client
+      .from(TABLE)
+      .select('*')
+      .eq('user_id', userId)
+      .order('submitted_at', { ascending: false })
+      .limit(20),
+  );
   if (error) {
     return { ok: false, history: [], error: error.message };
   }
@@ -77,7 +78,6 @@ export interface PushResult {
 }
 
 export async function pushSession(
-  client: SupabaseClient,
   userId: string,
   summary: ExamSessionSummary,
 ): Promise<PushResult> {
@@ -86,9 +86,9 @@ export async function pushSession(
   // a React StrictMode double-invoke of the push effect (or any other race)
   // produces a `duplicate key value violates unique constraint
   // "exam_sessions_pkey"` warning on the second call.
-  const { error } = await client
-    .from(TABLE)
-    .upsert(row, { onConflict: 'id', ignoreDuplicates: true });
+  const { error } = await query(async (client) =>
+    client.from(TABLE).upsert(row, { onConflict: 'id', ignoreDuplicates: true }),
+  );
   if (error) {
     return { ok: false, error: error.message };
   }

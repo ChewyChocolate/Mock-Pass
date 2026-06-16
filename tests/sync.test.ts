@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   readSupabaseEnv,
   isSupabaseConfigured,
@@ -10,7 +11,20 @@ import {
 } from '../src/lib/supabase';
 import { summaryToRow, rowToSummary, fetchRemoteHistory, pushSession } from '../src/lib/sync';
 import type { ExamSessionSummary } from '../src/types';
-import type { SupabaseClient } from '@supabase/supabase-js';
+
+// In the production code, fetchRemoteHistory and pushSession route
+// through `query()` from src/lib/supabase. In this test file we want
+// to drive the call with the same fake client the rest of the suite
+// builds locally, so we replace `query` with a passthrough that
+// supplies our own `from`-bearing client. The other exports of
+// supabase are not used here.
+vi.mock('../src/lib/supabase', async () => {
+  const actual = await vi.importActual<typeof import('../src/lib/supabase')>('../src/lib/supabase');
+  return {
+    ...actual,
+    query: (fn: (client: SupabaseClient) => unknown) => fn(makeFakeClient()),
+  };
+});
 
 const sampleSummary: ExamSessionSummary = {
   id: 'session-1700000000000',
@@ -167,39 +181,58 @@ describe('summaryToRow / rowToSummary', () => {
   });
 });
 
-describe('fetchRemoteHistory / pushSession', () => {
-  function makeFakeClient(handlers: {
-    selectImpl?: () => Promise<{ data: unknown; error: { message: string } | null }>;
-    insertImpl?: () => Promise<{ error: { message: string } | null }>;
-    upsertImpl?: () => Promise<{ error: { message: string } | null }>;
-  }): SupabaseClient {
-    return {
-      from: vi.fn().mockImplementation((table: string) => {
-        if (table !== 'exam_sessions') throw new Error(`unexpected table: ${table}`);
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                limit: vi.fn().mockImplementation(() =>
-                  handlers.selectImpl ? handlers.selectImpl() : Promise.resolve({ data: [], error: null }),
-                ),
-              }),
+interface FakeHandlers {
+  selectImpl?: () => Promise<{ data: unknown; error: { message: string } | null }>;
+  insertImpl?: (row: unknown) => Promise<{ error: { message: string } | null }>;
+  upsertImpl?: (row: unknown, options: unknown) => Promise<{ error: { message: string } | null }>;
+}
+
+let currentHandlers: FakeHandlers = {};
+
+function buildFakeClient(handlers: FakeHandlers): SupabaseClient {
+  return {
+    from: vi.fn().mockImplementation((table: string) => {
+      if (table !== 'exam_sessions') throw new Error(`unexpected table: ${table}`);
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockImplementation(() =>
+                handlers.selectImpl ? handlers.selectImpl() : Promise.resolve({ data: [], error: null }),
+              ),
             }),
           }),
-          insert: vi.fn().mockImplementation(() =>
-            handlers.insertImpl
-              ? handlers.insertImpl()
-              : Promise.resolve({ error: null }),
-          ),
-          upsert: vi.fn().mockImplementation(() =>
-            handlers.upsertImpl
-              ? handlers.upsertImpl()
-              : Promise.resolve({ error: null }),
-          ),
-        };
-      }),
-    } as unknown as SupabaseClient;
+        }),
+        insert: vi.fn().mockImplementation((row: unknown) =>
+          handlers.insertImpl
+            ? handlers.insertImpl(row)
+            : Promise.resolve({ error: null }),
+        ),
+        upsert: vi.fn().mockImplementation((row: unknown, options: unknown) =>
+          handlers.upsertImpl
+            ? handlers.upsertImpl(row, options)
+            : Promise.resolve({ error: null }),
+        ),
+      };
+    }),
+  } as unknown as SupabaseClient;
+}
+
+// Used by the vi.mock factory above. Reads from `currentHandlers`,
+// which the test bodies update via `makeFakeClient({...})` below.
+function makeFakeClient(): SupabaseClient {
+  return buildFakeClient(currentHandlers);
+}
+
+describe('fetchRemoteHistory / pushSession', () => {
+  function makeFakeClient(handlers: FakeHandlers): SupabaseClient {
+    currentHandlers = handlers;
+    return buildFakeClient(handlers);
   }
+
+  beforeEach(() => {
+    currentHandlers = {};
+  });
 
   it('fetchRemoteHistory returns mapped summaries on success', async () => {
     const client = makeFakeClient({
@@ -222,7 +255,7 @@ describe('fetchRemoteHistory / pushSession', () => {
           error: null,
         }),
     });
-    const result = await fetchRemoteHistory(client, 'u');
+    const result = await fetchRemoteHistory('u');
     expect(result.ok).toBe(true);
     expect(result.history).toHaveLength(1);
     expect(result.history[0]?.id).toBe('session-1');
@@ -234,30 +267,36 @@ describe('fetchRemoteHistory / pushSession', () => {
       selectImpl: () =>
         Promise.resolve({ data: null, error: { message: 'permission denied' } }),
     });
-    const result = await fetchRemoteHistory(client, 'u');
+    const result = await fetchRemoteHistory('u');
     expect(result.ok).toBe(false);
     expect(result.error).toBe('permission denied');
     expect(result.history).toEqual([]);
   });
 
   it('pushSession sends the row built by summaryToRow (via upsert)', async () => {
-    const upsert = vi.fn().mockResolvedValue({ error: null });
-    const client = {
-      from: vi.fn().mockReturnValue({ upsert }),
-    } as unknown as SupabaseClient;
-    const result = await pushSession(client, 'u', sampleSummary);
+    const upsertCalls: unknown[][] = [];
+    makeFakeClient({
+      upsertImpl: (row, options) => {
+        upsertCalls.push([row, options]);
+        return Promise.resolve({ error: null });
+      },
+    });
+    const result = await pushSession('u', sampleSummary);
     expect(result.ok).toBe(true);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ id: sampleSummary.id, user_id: 'u', score: 82.5 }),
-      expect.objectContaining({ onConflict: 'id', ignoreDuplicates: true }),
-    );
+    expect(upsertCalls).toHaveLength(1);
+    const [row, options] = upsertCalls[0] as [
+      Record<string, unknown>,
+      { onConflict: string; ignoreDuplicates: boolean },
+    ];
+    expect(row).toMatchObject({ id: sampleSummary.id, user_id: 'u', score: 82.5 });
+    expect(options).toMatchObject({ onConflict: 'id', ignoreDuplicates: true });
   });
 
   it('pushSession reports error on upsert failure', async () => {
     const client = makeFakeClient({
       upsertImpl: () => Promise.resolve({ error: { message: 'duplicate key' } }),
     });
-    const result = await pushSession(client, 'u', sampleSummary);
+    const result = await pushSession('u', sampleSummary);
     expect(result.ok).toBe(false);
     expect(result.error).toBe('duplicate key');
   });
@@ -270,8 +309,8 @@ describe('fetchRemoteHistory / pushSession', () => {
         return Promise.resolve({ error: null });
       },
     });
-    const r1 = await pushSession(client, 'u', sampleSummary);
-    const r2 = await pushSession(client, 'u', sampleSummary);
+    const r1 = await pushSession('u', sampleSummary);
+    const r2 = await pushSession('u', sampleSummary);
     expect(r1.ok).toBe(true);
     expect(r2.ok).toBe(true);
     expect(calls).toBe(2);
